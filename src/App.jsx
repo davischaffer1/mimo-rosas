@@ -47,6 +47,7 @@ import {
 // ============================================================================
 const DEFAULT_SUPABASE_URL = 'https://dktpnqekuxtsqmazelox.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_7WyhLNtUeEMNnbE_MyTo2g_IYrCA8AU';
+const STORE_CONFIG_CATEGORY_ID = '__mimo_store_config__';
 
 // ============================================================================
 // DADOS INICIAIS (SINCRONIZADOS ENTRE LOJA E PAINEL ADMIN)
@@ -561,69 +562,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 };
 
 const SUPABASE_SQL_SCHEMA = `-- ============================================================================
--- SCRIPT SQL COMPLETO - MIMO ROSAS (SUPABASE + STORAGE DE FOTOS)
+-- SCRIPT SQL COMPLETO - MIMO ROSAS (CATEGORIAS, PRODUTOS, PEDIDOS E FOTOS)
 -- Cole este código no menu "SQL Editor" do Supabase e clique em "Run"
 -- ============================================================================
 
--- 1. Tabela de Categorias
+drop table if exists public.orders cascade;
+
 create table if not exists public.categories (
-  id text primary key,
-  name text not null,
-  short_name text not null,
-  icon_type text not null,
-  description text,
-  created_at timestamptz default now()
-);
-
--- 2. Tabela de Produtos
-create table if not exists public.products (
-  id text primary key,
-  name text not null,
-  category text references public.categories(id) on delete set null,
-  price numeric(10,2) not null default 0,
-  stock integer not null default 0,
-  badge text,
-  badge_type text default 'star',
-  featured boolean default false,
-  active boolean default true,
-  rating numeric(3,2) default 5.0,
-  reviews integer default 10,
-  image text not null,
-  gallery jsonb default '[]'::jsonb,
-  variations jsonb default '["Padrão"]'::jsonb,
-  description text,
-  created_at timestamptz default now()
-);
-
--- 3. Tabela de Pedidos (Recebidos do Checkout)
-create table if not exists public.orders (
-  id text primary key,
-  customer_name text not null,
-  phone text not null,
-  delivery_method text not null,
-  address text,
-  cep text,
-  payment_method text not null,
-  status text not null default 'Pendente',
-  total numeric(10,2) not null,
-  items jsonb not null default '[]'::jsonb,
-  created_at timestamptz default now()
-);
-
--- 4. Habilitar RLS e liberar acesso para a chave Publishable (Loja + Painel)
-alter table public.categories enable row level security;
-alter table public.products enable row level security;
-alter table public.orders enable row level security;
-
-drop policy if exists "Liberar categorias geral" on public.categories;
-create policy "Liberar categorias geral" on public.categories for all using (true) with check (true);
-`;
-
-const SUPABASE_STORAGE_SQL_ONLY = `-- RECRIAR TABELAS COM TODAS AS COLUNAS EXATAS (RESOLVE ERRO PGRST204 DEFINITIVAMENTE)
-drop table if exists public.products cascade;
-drop table if exists public.categories cascade;
-
-create table public.categories (
   id text primary key,
   name text not null,
   short_name text,
@@ -632,7 +577,7 @@ create table public.categories (
   created_at timestamptz default now()
 );
 
-create table public.products (
+create table if not exists public.products (
   id text primary key,
   name text not null,
   category text,
@@ -651,11 +596,75 @@ create table public.products (
   created_at timestamptz default now()
 );
 
+create table public.orders (
+  id text primary key,
+  customer text not null,
+  customer_name text,
+  phone text,
+  email text,
+  delivery_method text default 'delivery',
+  address text,
+  city text,
+  cep text,
+  notes text,
+  total numeric(10,2) not null default 0,
+  shipping numeric(10,2) default 0,
+  status text default 'Aguardando PIX',
+  payment_method text default 'pix',
+  date text,
+  items jsonb default '[]'::jsonb,
+  mp_payment_id text,
+  mp_preference_id text,
+  created_at timestamptz default now()
+);
+
 alter table public.categories enable row level security;
 alter table public.products enable row level security;
+alter table public.orders enable row level security;
 
+drop policy if exists "Acesso total categories" on public.categories;
 create policy "Acesso total categories" on public.categories for all using (true) with check (true);
+
+drop policy if exists "Acesso total products" on public.products;
 create policy "Acesso total products" on public.products for all using (true) with check (true);
+
+drop policy if exists "Acesso total orders" on public.orders;
+create policy "Acesso total orders" on public.orders for all using (true) with check (true);
+
+notify pgrst, 'reload schema';`;
+
+const SUPABASE_STORAGE_SQL_ONLY = `-- ============================================================================
+-- DESTRAVAR TABELA DE PEDIDOS (ORDERS) + PRODUTOS NO SUPABASE
+-- Cole no SQL Editor do Supabase e clique em Run
+-- ============================================================================
+drop table if exists public.orders cascade;
+
+create table public.orders (
+  id text primary key,
+  customer text not null,
+  customer_name text,
+  phone text,
+  email text,
+  delivery_method text default 'delivery',
+  address text,
+  city text,
+  cep text,
+  notes text,
+  total numeric(10,2) not null default 0,
+  shipping numeric(10,2) default 0,
+  status text default 'Aguardando PIX',
+  payment_method text default 'pix',
+  date text,
+  items jsonb default '[]'::jsonb,
+  mp_payment_id text,
+  mp_preference_id text,
+  created_at timestamptz default now()
+);
+
+alter table public.orders enable row level security;
+
+create policy "Acesso total orders" on public.orders
+  for all using (true) with check (true);
 
 notify pgrst, 'reload schema';`;
 
@@ -1121,20 +1130,30 @@ export default function App() {
   const [checkoutData, setCheckoutData] = useState({
     name: '',
     phone: '',
+    email: '',
     cep: '',
     address: '',
     number: '',
     complement: '',
     neighborhood: '',
     city: '',
+    notes: '',
     deliveryMethod: 'delivery',
-    paymentMethod: 'pix',
+    paymentMethod: 'mercadopago',
     cardNumber: '',
     cardHolder: '',
     cardExpiry: '',
     cardCvv: ''
   });
-  const [orderSuccess, setOrderSuccess] = useState(null);
+  const [orderSuccess, setOrderSuccess] = useState(() => {
+    try {
+      const savedActive = localStorage.getItem('mimo_active_order');
+      return savedActive ? JSON.parse(savedActive) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
   const [pixCheckCount, setPixCheckCount] = useState(0);
 
   // Assistente Virtual
@@ -1198,35 +1217,6 @@ export default function App() {
     }
   }, []);
 
-  // Retorno automático do Checkout Pro do Mercado Pago (?mp_status=approved&external_reference=MR-12345)
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const mpStatus = params.get('collection_status') || params.get('status') || params.get('mp_status');
-      const orderRef = params.get('external_reference') || params.get('order_id');
-
-      if (mpStatus === 'approved' && orderRef) {
-        setActiveView('checkout');
-        handleUpdateOrderStatus(orderRef, 'Pago');
-        setOrderSuccess({
-          code: orderRef,
-          customer: 'Cliente Mimo Rosas',
-          total: 0,
-          method: 'mercadopago',
-          delivery: 'delivery',
-          paymentConfirmed: true,
-          whatsappUrl: `https://wa.me/${(
-            storeConfig.whatsappNumber || '5554999999999'
-          ).replace(/\D/g, '')}?text=${encodeURIComponent(
-            `Olá Mimo Rosas! 🌹 Meu pagamento no Checkout Pro Mercado Pago para o pedido *${orderRef}* acabou de ser aprovado!`
-          )}`
-        });
-      }
-    } catch {
-      // ignora
-    }
-  }, []);
-
   // Persistência Local
   useEffect(() => {
     try {
@@ -1247,10 +1237,23 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('mimo_db_orders', JSON.stringify(orders));
+      localStorage.setItem('mimo_orders', JSON.stringify(orders));
     } catch {
       // ignore
     }
   }, [orders]);
+
+  useEffect(() => {
+    try {
+      if (orderSuccess) {
+        localStorage.setItem('mimo_active_order', JSON.stringify(orderSuccess));
+      } else {
+        localStorage.removeItem('mimo_active_order');
+      }
+    } catch {
+      // ignore
+    }
+  }, [orderSuccess]);
 
   useEffect(() => {
     try {
@@ -1427,6 +1430,90 @@ export default function App() {
     Prefer: prefer
   });
 
+  // Salva as configurações da loja (Token Mercado Pago, Chave PIX, WhatsApp) no Supabase
+  // para que guias anônimas e celulares de clientes carreguem automaticamente!
+  const syncStoreConfigToSupabase = async (cfgToSave) => {
+    if (!supabaseUrl || !supabaseKey) return;
+    try {
+      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+      const payload = {
+        id: STORE_CONFIG_CATEGORY_ID,
+        name: '__CONFIG_SISTEMA_MIMO_ROSAS__',
+        short_name: 'Config',
+        icon_type: 'config',
+        description: JSON.stringify(cfgToSave)
+      };
+      await fetch(`${cleanUrl}/rest/v1/categories`, {
+        method: 'POST',
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
+        body: JSON.stringify([payload])
+      });
+    } catch {
+      // ignora erro se offline
+    }
+  };
+
+  // Consulta na API do Mercado Pago se existe algum pagamento aprovado para um pedido (external_reference ou payment_id)
+  const verifyOrderPaymentOnMercadoPago = async (orderId, paymentIdParam = null, customToken = null) => {
+    const token = (customToken || storeConfig.mercadoPagoAccessToken || '').trim();
+    if (!token.startsWith('APP_USR-') && !token.startsWith('TEST-')) {
+      return null;
+    }
+
+    try {
+      // 1. Se veio payment_id direto na URL de retorno do Mercado Pago, consulta o pagamento específico
+      if (paymentIdParam && paymentIdParam !== 'null') {
+        const directRes = await fetch(
+          `https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentIdParam)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        if (directRes.ok) {
+          const directData = await directRes.json();
+          if (directData && directData.status) {
+            return {
+              status: directData.status,
+              paymentId: String(directData.id || paymentIdParam)
+            };
+          }
+        }
+      }
+
+      // 2. Busca pagamentos pela external_reference (código do pedido ex: MR-12345)
+      if (orderId) {
+        const searchRes = await fetch(
+          `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(
+            orderId
+          )}&sort=date_created&criteria=desc`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          const results = Array.isArray(searchData.results) ? searchData.results : [];
+          const approvedPayment = results.find((p) => p.status === 'approved');
+          if (approvedPayment) {
+            return {
+              status: 'approved',
+              paymentId: String(approvedPayment.id)
+            };
+          }
+          if (results.length > 0) {
+            return {
+              status: results[0].status,
+              paymentId: String(results[0].id)
+            };
+          }
+        }
+      }
+    } catch {
+      // falha de rede silenciosa
+    }
+    return null;
+  };
+
   const fetchFromSupabase = async (silent = false) => {
     const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
     const cleanKey = supabaseKey.trim();
@@ -1444,6 +1531,28 @@ export default function App() {
     }
 
     try {
+      // 1. Carrega configurações globais salvas na nuvem (para funcionar em aba anônima / celular do cliente)
+      try {
+        const cfgRes = await fetch(
+          `${cleanUrl}/rest/v1/categories?id=eq.${encodeURIComponent(
+            STORE_CONFIG_CATEGORY_ID
+          )}&select=description`,
+          { headers: sbHeaders() }
+        );
+        if (cfgRes.ok) {
+          const cfgRows = await cfgRes.json();
+          if (Array.isArray(cfgRows) && cfgRows[0]?.description) {
+            const parsedCloudConfig = JSON.parse(cfgRows[0].description);
+            setStoreConfig((prev) => ({
+              ...prev,
+              ...parsedCloudConfig
+            }));
+          }
+        }
+      } catch {
+        // segue normalmente
+      }
+
       const prodRes = await fetch(`${cleanUrl}/rest/v1/products?select=*&order=created_at.asc`, {
         headers: sbHeaders()
       });
@@ -1488,23 +1597,42 @@ export default function App() {
       if (Array.isArray(dbOrders) && dbOrders.length > 0) {
         const mappedOrders = dbOrders.map((o) => ({
           id: o.id,
-          customerName: o.customer_name,
-          phone: o.phone,
-          deliveryMethod: o.delivery_method,
-          address: o.address,
-          cep: o.cep,
-          paymentMethod: o.payment_method,
-          status: o.status,
-          total: Number(o.total),
-          createdAt: new Date(o.created_at).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
+          customer: o.customer || o.customer_name || 'Cliente Mimo Rosas',
+          customerName: o.customer || o.customer_name || 'Cliente Mimo Rosas',
+          phone: o.phone || '',
+          email: o.email || '',
+          deliveryMethod: o.delivery_method || 'delivery',
+          address: o.address || '',
+          city: o.city || '',
+          cep: o.cep || '',
+          notes: o.notes || '',
+          paymentMethod: o.payment_method || 'pix',
+          status: o.status || 'Aguardando PIX',
+          total: Number(o.total || 0),
+          shipping: Number(o.shipping || 0),
+          mpPaymentId: o.mp_payment_id || null,
+          mpPreferenceId: o.mp_preference_id || null,
+          createdAt:
+            o.date ||
+            (o.created_at
+              ? new Date(o.created_at).toLocaleString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : 'Recente'),
           items: Array.isArray(o.items) ? o.items : []
         }));
-        setOrders(mappedOrders);
+
+        // Mescla com eventuais pedidos salvos localmente que ainda não tinham subido para não sumir nada no F5
+        setOrders((prevLocal) => {
+          const dbIds = new Set(mappedOrders.map((item) => item.id));
+          const unsyncedLocal = (prevLocal || []).filter(
+            (item) => item.id && !dbIds.has(item.id) && item.id !== 'MR-94821'
+          );
+          return [...unsyncedLocal, ...mappedOrders];
+        });
       }
 
       setSbStatus({
@@ -1672,29 +1800,60 @@ export default function App() {
     }
   };
 
-  const syncNewOrderToSupabase = async (orderObj) => {
-    if (!supabaseUrl || !supabaseKey) return;
+  // Salva pedido no Supabase com proteção contra falta de colunas (auto-adaptação se PGRST204 ocorrer)
+  const saveOrderToSupabase = async (orderObj) => {
+    if (!supabaseUrl || !supabaseKey) return false;
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-      await fetch(`${cleanUrl}/rest/v1/orders`, {
-        method: 'POST',
-        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
-        body: JSON.stringify({
-          id: orderObj.id,
-          customer_name: orderObj.customerName,
-          phone: orderObj.phone,
-          delivery_method: orderObj.deliveryMethod,
-          address: orderObj.address,
-          cep: orderObj.cep,
-          payment_method: orderObj.paymentMethod,
-          status: orderObj.status,
-          total: Number(orderObj.total),
-          items: orderObj.items
-        })
-      });
-    } catch {
-      // fallback local
+      let currentPayload = {
+        id: String(orderObj.id),
+        customer: String(orderObj.customer || orderObj.customerName || 'Cliente'),
+        customer_name: String(orderObj.customerName || orderObj.customer || 'Cliente'),
+        phone: String(orderObj.phone || ''),
+        email: String(orderObj.email || ''),
+        delivery_method: String(orderObj.deliveryMethod || 'delivery'),
+        address: String(orderObj.address || ''),
+        city: String(orderObj.city || ''),
+        cep: String(orderObj.cep || ''),
+        notes: String(orderObj.notes || ''),
+        payment_method: String(orderObj.paymentMethod || 'pix'),
+        status: String(orderObj.status || 'Aguardando PIX'),
+        total: Number(orderObj.total || 0),
+        shipping: Number(orderObj.shipping || 0),
+        date: String(orderObj.date || orderObj.createdAt || new Date().toLocaleString('pt-BR')),
+        items: Array.isArray(orderObj.items) ? orderObj.items : [],
+        mp_payment_id: orderObj.mpPaymentId ? String(orderObj.mpPaymentId) : null,
+        mp_preference_id: orderObj.mpPreferenceId ? String(orderObj.mpPreferenceId) : null
+      };
+
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const res = await fetch(`${cleanUrl}/rest/v1/orders`, {
+          method: 'POST',
+          headers: sbHeaders('resolution=merge-duplicates,return=representation'),
+          body: JSON.stringify([currentPayload])
+        });
+
+        if (res.ok) {
+          return true;
+        }
+
+        const errText = await res.text();
+        const matchMissingCol = errText.match(/Could not find the '([^']+)' column/);
+        if (matchMissingCol && matchMissingCol[1]) {
+          const missingCol = matchMissingCol[1];
+          const nextPayload = { ...currentPayload };
+          delete nextPayload[missingCol];
+          currentPayload = nextPayload;
+          continue;
+        } else {
+          console.error('Detalhe do erro Supabase ao salvar pedido:', errText);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Erro de rede ao salvar pedido no Supabase:', err);
     }
+    return false;
   };
 
   // Conecta automaticamente ao carregar se a chave já estiver configurada
@@ -1703,6 +1862,129 @@ export default function App() {
       fetchFromSupabase(true);
     }
   }, []);
+
+  // ============================================================================
+  // RETORNO INTELIGENTE DO CHECKOUT PRO MERCADO PAGO (NÃO FINGE APROVAÇÃO SE PENDENTE)
+  // ============================================================================
+  useEffect(() => {
+    const handleMercadoPagoReturn = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const mpReturn = params.get('mp_return');
+        const collectionStatus = params.get('collection_status') || params.get('status') || params.get('mp_status');
+        const orderRef = params.get('external_reference') || params.get('order_id');
+        const paymentId = params.get('payment_id') || params.get('collection_id');
+
+        if (!orderRef && !mpReturn && !collectionStatus) return;
+
+        setActiveView('checkout');
+
+        // 1. Procura o pedido salvo no localStorage ou no Supabase
+        let savedOrdersList = [];
+        try {
+          savedOrdersList = JSON.parse(localStorage.getItem('mimo_db_orders') || '[]');
+        } catch {
+          savedOrdersList = [];
+        }
+
+        let foundOrder = savedOrdersList.find((o) => o.id === orderRef);
+
+        if (!foundOrder && supabaseUrl && supabaseKey && orderRef) {
+          try {
+            const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+            const res = await fetch(
+              `${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderRef)}&select=*`,
+              { headers: sbHeaders() }
+            );
+            if (res.ok) {
+              const rows = await res.json();
+              if (Array.isArray(rows) && rows[0]) {
+                const o = rows[0];
+                foundOrder = {
+                  id: o.id,
+                  customer: o.customer || o.customer_name || 'Cliente Mimo Rosas',
+                  customerName: o.customer || o.customer_name || 'Cliente Mimo Rosas',
+                  phone: o.phone || '',
+                  total: Number(o.total || 0),
+                  paymentMethod: o.payment_method || 'mercadopago',
+                  deliveryMethod: o.delivery_method || 'delivery',
+                  status: o.status || 'Aguardando PIX',
+                  items: Array.isArray(o.items) ? o.items : []
+                };
+              }
+            }
+          } catch {
+            // fallback
+          }
+        }
+
+        const totalVal = foundOrder ? Number(foundOrder.total || 0) : Number(orderSuccess?.total || 0);
+        const customerName = foundOrder
+          ? foundOrder.customerName || foundOrder.customer
+          : orderSuccess?.customer || 'Cliente Mimo Rosas';
+
+        // 2. Verifica se o status REAL na URL ou na API do Mercado Pago é 'approved'
+        let isReallyApproved =
+          collectionStatus === 'approved' ||
+          foundOrder?.status === 'Pago';
+
+        if (!isReallyApproved && orderRef) {
+          const mpCheck = await verifyOrderPaymentOnMercadoPago(orderRef, paymentId);
+          if (mpCheck && mpCheck.status === 'approved') {
+            isReallyApproved = true;
+          }
+        }
+
+        if (isReallyApproved && orderRef) {
+          await handleUpdateOrderStatus(orderRef, 'Pago');
+        }
+
+        const pixCode = generatePixCopyPaste(
+          storeConfig.pixKey || storeConfig.whatsappNumber,
+          storeConfig.pixHolderName || 'MIMO ROSAS',
+          'BRASIL',
+          totalVal || 1,
+          (orderRef || 'MIMOROSAS').replace(/[^A-Z0-9]/g, '')
+        );
+
+        setOrderSuccess((prev) => ({
+          ...(prev || {}),
+          code: orderRef || prev?.code || 'MR-PEDIDO',
+          customer: customerName,
+          total: totalVal,
+          method: 'mercadopago',
+          delivery: foundOrder?.deliveryMethod || prev?.delivery || 'delivery',
+          paymentConfirmed: isReallyApproved,
+          mpPaymentId: paymentId && paymentId !== 'null' ? paymentId : prev?.mpPaymentId || null,
+          mpCheckoutProUrl: prev?.mpCheckoutProUrl || null,
+          pixCode: prev?.pixCode || pixCode,
+          qrCodeUrl:
+            prev?.qrCodeUrl ||
+            `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
+              pixCode
+            )}`,
+          whatsappUrl: `https://wa.me/${(
+            storeConfig.whatsappNumber || '5554999999999'
+          ).replace(/\D/g, '')}?text=${encodeURIComponent(
+            isReallyApproved
+              ? `Olá Mimo Rosas! 🌹 Meu pagamento do pedido *${orderRef}* (${formatBRL(
+                  totalVal
+                )}) já foi confirmado automaticamente!`
+              : `Olá Mimo Rosas! 🌹 Fiz o pedido *${orderRef}* (${formatBRL(
+                  totalVal
+                )}) e estou finalizando o pagamento PIX.`
+          )}`
+        }));
+
+        // Limpa os parâmetros da URL sem recarregar a página para ficar limpo
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch {
+        // ignora
+      }
+    };
+
+    handleMercadoPagoReturn();
+  }, [supabaseUrl, supabaseKey]);
 
   // Rotação do Banner
   useEffect(() => {
@@ -1885,274 +2167,263 @@ export default function App() {
         botReply =
           'Trabalhamos com uma linha artesanal completa: Infusões e Blends para Chimarrão, Cápsulas de Chá em formato de Rosa, Cápsulas de Café, Cuias Resinadas, Enfeites, Chaveiros e Bombas Personalizadas! 🌹 Veja nossos queridinhos:';
         suggestedProducts = visibleProducts.slice(0, 2);
-      } else if (optionType === 'precos') {
-        botReply = `Nossos produtos têm valores super acessíveis: Enfeites a partir de R$ 14,90, Cápsulas de Chá Rosa por R$ 19,90, Infusões por R$ 24,90 e Cuias Resinadas a partir de R$ 119,90. Compras acima de ${formatBRL(
-          storeConfig.freeShippingMin
-        )} ganham Frete Grátis! ✨`;
-        suggestedProducts = [visibleProducts[1], visibleProducts[3]].filter(Boolean);
-      } else if (optionType === 'presentes') {
-        botReply =
-          'Para presentear com emoção, recomendo as nossas Cápsulas de Chá – Rosa e os Chaveiros em Resina com Pétalas Reais. Todos vão embalados com cheirinho Mimo Rosas! 🎁💖';
-        suggestedProducts = visibleProducts
-          .filter((p) => p.category === 'capsulas-cha' || p.category === 'chaveiros')
-          .slice(0, 2);
-      } else if (optionType === 'duvidas') {
-        botReply =
-          'Como usar as Cápsulas de Chá Rosa? 🌹 Basta colocar 1 rosa em 200ml de água quente (85°C) e aguardar 3 minutinhos: ela derrete e libera as pétalas e o aroma natural!';
-      } else if (optionType === 'pedidos') {
-        botReply =
-          cart.length > 0
-            ? `Você já tem ${cartCount} ${
-                cartCount === 1 ? 'item' : 'itens'
-              } na sacola (${formatBRL(
-                cartSubtotal
-              )}). Posso te levar direto para o Checkout agora mesmo!`
-            : 'Para fazer seu pedido é muito simples: escolha seus produtos, clique em "Adicionar ao carrinho" e preencha seus dados de Entrega ou Retirada.';
-      } else {
-        const q = (customQuestion || '').toLowerCase();
-        const found = visibleProducts.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            (p.description || '').toLowerCase().includes(q)
-        );
-        if (found.length > 0) {
-          botReply = `Encontrei ${found.length} ${
-            found.length === 1 ? 'opção especial' : 'opções especiais'
-          } para você na Mimo Rosas! 🌹 Toque no card abaixo para ver os detalhes:`;
-          suggestedProducts = found.slice(0, 2);
-        } else {
-          botReply =
-            'Que carinho receber sua mensagem! 🌹 Todas as nossas peças são produzidas artesanalmente. Escolha uma das opções abaixo ou explore nossas categorias!';
-        }
-      }
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `b-${Date.now()}`,
-          sender: 'bot',
-          text: botReply,
-          products: suggestedProducts,
-          time: 'Agora'
-        }
-      ]);
-      setIsBotTyping(false);
-    }, 600);
-  };
-
-  const handleChatSubmit = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const text = chatInput.trim();
-    setChatInput('');
-    handleAssistantOption('custom', text);
-  };
-
-  // Finalizar Pedido (Salva no Admin + Sincroniza com o Supabase em Tempo Real)
+  // Finalizar Pedido (Salva no Admin + Sincroniza com o Supabase ANTES de redirecionar para o Mercado Pago)
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
-    if (!checkoutData.name.trim() || !checkoutData.phone.trim()) return;
+    if (!checkoutData.name.trim() || !checkoutData.phone.trim() || isSubmittingCheckout) return;
 
-    const code = `MR-${Math.floor(10000 + Math.random() * 90000)}`;
-    const newOrder = {
-      id: code,
-      customerName: checkoutData.name,
-      phone: checkoutData.phone,
-      deliveryMethod: checkoutData.deliveryMethod,
-      address:
+    setIsSubmittingCheckout(true);
+
+    try {
+      const code = `MR-${Math.floor(10000 + Math.random() * 90000)}`;
+      const nowFormatted = new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const fullAddress =
         checkoutData.deliveryMethod === 'delivery'
-          ? `${checkoutData.address}, ${checkoutData.number || 'S/N'} - ${
-              checkoutData.city || ''
+          ? `${checkoutData.address}${checkoutData.number ? `, ${checkoutData.number}` : ''}${
+              checkoutData.city ? ` - ${checkoutData.city}` : ''
             }`
-          : 'Retirada no Ateliê Mimo Rosas',
-      cep: checkoutData.cep || '-',
-      paymentMethod: checkoutData.paymentMethod,
-      status: checkoutData.paymentMethod === 'pix' ? 'Aguardando PIX' : 'Pago',
-      total: cartTotal,
-      createdAt: 'Agora mesmo',
-      items: cart.map((item) => ({
-        id: item.id,
-        name: `${item.name} (${item.variation})`,
-        qty: item.quantity,
-        price: item.price
-      }))
-    };
+          : 'Retirada no Ateliê Mimo Rosas';
 
-    // 1. Adiciona no Painel Admin local
-    setOrders((prev) => [newOrder, ...prev]);
-
-    // 2. Baixa estoque dos produtos comprados
-    setProducts((prev) =>
-      prev.map((prod) => {
-        const bought = cart
-          .filter((c) => c.id === prod.id)
-          .reduce((sum, c) => sum + c.quantity, 0);
-        if (bought > 0) {
-          const updated = { ...prod, stock: Math.max(0, prod.stock - bought) };
-          syncSingleProductToSupabase(updated);
-          return updated;
-        }
-        return prod;
-      })
-    );
-
-    // 3. Salva o pedido diretamente no Supabase
-    await syncNewOrderToSupabase(newOrder);
-
-    let pixCode = generatePixCopyPaste(
-      storeConfig.pixKey || storeConfig.whatsappNumber,
-      storeConfig.pixHolderName || 'MIMO ROSAS',
-      'BRASIL',
-      cartTotal,
-      code.replace(/[^A-Z0-9]/g, '')
-    );
-    let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
-      pixCode
-    )}`;
-    let mpPaymentId = null;
-    let mpCheckoutProUrl = null;
-
-    // 4. Integração Checkout Pro do Mercado Pago (Preference API) - Cria link oficial com PIX + Cartão + Retorno Automático
-    if (
-      storeConfig.mercadoPagoAccessToken &&
-      storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
-    ) {
-      try {
-        const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
-        const mpItems = cart.map((item) => ({
+      const newOrder = {
+        id: code,
+        customer: checkoutData.name.trim(),
+        customerName: checkoutData.name.trim(),
+        phone: checkoutData.phone.trim(),
+        email: (checkoutData.email || '').trim(),
+        deliveryMethod: checkoutData.deliveryMethod,
+        address: fullAddress,
+        city: checkoutData.city || '',
+        cep: checkoutData.cep || '-',
+        notes: checkoutData.notes || '',
+        paymentMethod: checkoutData.paymentMethod,
+        status: checkoutData.paymentMethod === 'card' ? 'Pago' : 'Aguardando PIX',
+        total: Number(cartTotal.toFixed(2)),
+        shipping: Number(shippingFee.toFixed(2)),
+        date: nowFormatted,
+        createdAt: nowFormatted,
+        mpPaymentId: null,
+        mpPreferenceId: null,
+        items: cart.map((item) => ({
           id: item.id,
-          title: `${item.name} (${item.variation})`,
-          quantity: Number(item.quantity),
-          currency_id: 'BRL',
-          unit_price: Number(Number(item.price).toFixed(2))
-        }));
+          name: `${item.name} (${item.variation})`,
+          qty: item.quantity,
+          price: item.price
+        }))
+      };
 
-        if (shippingFee > 0) {
-          mpItems.push({
-            id: 'frete',
-            title: 'Frete / Entrega Mimo Rosas',
-            quantity: 1,
+      // 1. Salva IMEDIATAMENTE no estado e no localStorage antes de qualquer chamada externa
+      const updatedOrdersList = [newOrder, ...orders];
+      setOrders(updatedOrdersList);
+      try {
+        localStorage.setItem('mimo_db_orders', JSON.stringify(updatedOrdersList));
+        localStorage.setItem('mimo_orders', JSON.stringify(updatedOrdersList));
+      } catch {
+        // ignore
+      }
+
+      // 2. Baixa estoque dos produtos comprados
+      setProducts((prev) =>
+        prev.map((prod) => {
+          const bought = cart
+            .filter((c) => c.id === prod.id)
+            .reduce((sum, c) => sum + c.quantity, 0);
+          if (bought > 0) {
+            const updated = { ...prod, stock: Math.max(0, prod.stock - bought) };
+            syncSingleProductToSupabase(updated);
+            return updated;
+          }
+          return prod;
+        })
+      );
+
+      // 3. Aguarda salvar na tabela `orders` do Supabase ANTES de redirecionar
+      await saveOrderToSupabase(newOrder);
+
+      let pixCode = generatePixCopyPaste(
+        storeConfig.pixKey || storeConfig.whatsappNumber,
+        storeConfig.pixHolderName || 'MIMO ROSAS',
+        'BRASIL',
+        cartTotal,
+        code.replace(/[^A-Z0-9]/g, '')
+      );
+      let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
+        pixCode
+      )}`;
+      let mpPaymentId = null;
+      let mpCheckoutProUrl = null;
+      let mpPreferenceId = null;
+
+      const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
+
+      // 4. Integração Checkout Pro do Mercado Pago (Preference API) com back_urls separadas (success / pending / failure)
+      if (activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-')) {
+        try {
+          const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
+          const mpItems = cart.map((item) => ({
+            id: String(item.id),
+            title: `${item.name} (${item.variation})`,
+            quantity: Number(item.quantity),
             currency_id: 'BRL',
-            unit_price: Number(Number(shippingFee).toFixed(2))
-          });
-        }
+            unit_price: Number(Number(item.price).toFixed(2))
+          }));
 
-        const prefRes = await fetch(
-          'https://api.mercadopago.com/checkout/preferences',
-          {
+          if (shippingFee > 0) {
+            mpItems.push({
+              id: 'frete',
+              title: 'Frete / Entrega Mimo Rosas',
+              quantity: 1,
+              currency_id: 'BRL',
+              unit_price: Number(Number(shippingFee).toFixed(2))
+            });
+          }
+
+          const prefRes = await fetch(
+            'https://api.mercadopago.com/checkout/preferences',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${activeMpToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                items: mpItems,
+                payer: {
+                  name: checkoutData.name.trim(),
+                  email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
+                  phone: {
+                    number: checkoutData.phone.replace(/\D/g, '')
+                  }
+                },
+                external_reference: code,
+                back_urls: {
+                  success: `${currentOrigin}/?mp_return=success&order_id=${code}`,
+                  pending: `${currentOrigin}/?mp_return=pending&order_id=${code}`,
+                  failure: `${currentOrigin}/?mp_return=failure&order_id=${code}`
+                },
+                auto_return: 'approved',
+                statement_descriptor: 'MIMOROSAS'
+              })
+            }
+          );
+
+          if (prefRes.ok) {
+            const prefData = await prefRes.json();
+            if (prefData.init_point) {
+              mpCheckoutProUrl = prefData.init_point;
+              mpPreferenceId = prefData.id || null;
+              newOrder.mpPreferenceId = mpPreferenceId;
+              await saveOrderToSupabase(newOrder);
+            }
+          }
+        } catch {
+          // Fallback para QR Code direto na tela
+        }
+      }
+
+      // 5. Se escolheu PIX direto e tem Token Mercado Pago, tenta gerar QR Code dinâmico na tela
+      if (
+        (checkoutData.paymentMethod === 'pix' || !mpCheckoutProUrl) &&
+        (activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-'))
+      ) {
+        try {
+          const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${activeMpToken}`,
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': `${code}-${Date.now()}`
             },
             body: JSON.stringify({
-              items: mpItems,
-              payer: {
-                name: checkoutData.name,
-                phone: {
-                  number: checkoutData.phone.replace(/\D/g, '')
-                }
-              },
+              transaction_amount: Number(cartTotal.toFixed(2)),
+              description: `Pedido ${code} - Mimo Rosas`,
+              payment_method_id: 'pix',
               external_reference: code,
-              back_urls: {
-                success: `${currentOrigin}/?mp_status=approved&external_reference=${code}`,
-                pending: `${currentOrigin}/?mp_status=pending&external_reference=${code}`,
-                failure: `${currentOrigin}/?mp_status=failure&external_reference=${code}`
-              },
-              auto_return: 'approved',
-              statement_descriptor: 'MIMOROSAS'
+              payer: {
+                email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
+                first_name: checkoutData.name.split(' ')[0] || 'Cliente'
+              }
             })
-          }
-        );
-
-        if (prefRes.ok) {
-          const prefData = await prefRes.json();
-          if (prefData.init_point) {
-            mpCheckoutProUrl = prefData.init_point;
-          }
-        }
-      } catch {
-        // Fallback para QR Code direto
-      }
-    }
-
-    // 5. Se escolheu PIX direto e tem Token Mercado Pago, também tenta gerar QR Code dinâmico na tela
-    if (
-      checkoutData.paymentMethod === 'pix' &&
-      storeConfig.mercadoPagoAccessToken &&
-      storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
-    ) {
-      try {
-        const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`,
-            'Content-Type': 'application/json',
-            'X-Idempotency-Key': `${code}-${Date.now()}`
-          },
-          body: JSON.stringify({
-            transaction_amount: Number(cartTotal.toFixed(2)),
-            description: `Pedido ${code} - Mimo Rosas`,
-            payment_method_id: 'pix',
-            payer: {
-              email: 'cliente@mimorosas.com.br',
-              first_name: checkoutData.name.split(' ')[0] || 'Cliente'
+          });
+          if (mpRes.ok) {
+            const mpData = await mpRes.json();
+            const txData = mpData?.point_of_interaction?.transaction_data;
+            if (txData?.qr_code) {
+              pixCode = txData.qr_code;
+              qrCodeUrl = txData.qr_code_base64
+                ? `data:image/png;base64,${txData.qr_code_base64}`
+                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
+                    pixCode
+                  )}`;
+              mpPaymentId = String(mpData.id);
+              newOrder.mpPaymentId = mpPaymentId;
+              await saveOrderToSupabase(newOrder);
             }
-          })
-        });
-        if (mpRes.ok) {
-          const mpData = await mpRes.json();
-          const txData = mpData?.point_of_interaction?.transaction_data;
-          if (txData?.qr_code) {
-            pixCode = txData.qr_code;
-            qrCodeUrl = txData.qr_code_base64
-              ? `data:image/png;base64,${txData.qr_code_base64}`
-              : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
-                  pixCode
-                )}`;
-            mpPaymentId = mpData.id;
           }
+        } catch {
+          // Mantém QR Code padrão e monitora via API Search / Supabase
         }
-      } catch {
-        // Em caso de bloqueio CORS do navegador, mantém o QR Code BR Code padrão e monitora via Supabase
       }
-    }
 
-    const itemsSummaryText = newOrder.items
-      .map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`)
-      .join('\n');
+      const itemsSummaryText = newOrder.items
+        .map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`)
+        .join('\n');
 
-    const waMessage =
-      `Olá Mimo Rosas! 🌹 Acabei de fazer o pedido *${code}* no site:\n\n` +
-      `*Cliente:* ${checkoutData.name}\n` +
-      `*Telefone:* ${checkoutData.phone}\n` +
-      `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
-      `*Pagamento:* ${checkoutData.paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}\n\n` +
-      `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
-      `*Total:* ${formatBRL(cartTotal)}`;
+      const waMessage =
+        `Olá Mimo Rosas! 🌹 Acabei de fazer o pedido *${code}* no site:\n\n` +
+        `*Cliente:* ${checkoutData.name}\n` +
+        `*Telefone:* ${checkoutData.phone}\n` +
+        `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
+        `*Pagamento:* ${
+          checkoutData.paymentMethod === 'mercadopago'
+            ? 'Checkout Pro Mercado Pago'
+            : checkoutData.paymentMethod === 'pix'
+            ? 'PIX'
+            : 'Cartão de Crédito'
+        }\n\n` +
+        `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
+        `*Total:* ${formatBRL(cartTotal)}`;
 
-    setPixCheckCount(0);
-    setOrderSuccess({
-      code,
-      customer: checkoutData.name,
-      total: cartTotal,
-      method: checkoutData.paymentMethod,
-      delivery: checkoutData.deliveryMethod,
-      paymentConfirmed: checkoutData.paymentMethod === 'card',
-      mpPaymentId,
-      mpCheckoutProUrl,
-      pixCode,
-      qrCodeUrl,
-      whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(
-        /\D/g,
-        ''
-      )}?text=${encodeURIComponent(waMessage)}`
-    });
-    setCart([]);
+      const successObj = {
+        code,
+        customer: checkoutData.name,
+        total: cartTotal,
+        method: checkoutData.paymentMethod,
+        delivery: checkoutData.deliveryMethod,
+        paymentConfirmed: checkoutData.paymentMethod === 'card',
+        mpPaymentId,
+        mpPreferenceId,
+        mpCheckoutProUrl,
+        pixCode,
+        qrCodeUrl,
+        whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(
+          /\D/g,
+          ''
+        )}?text=${encodeURIComponent(waMessage)}`
+      };
 
-    // Se o cliente escolheu Checkout Pro Mercado Pago e o link foi gerado, redireciona automaticamente!
-    if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) {
-      window.location.href = mpCheckoutProUrl;
+      setPixCheckCount(0);
+      setOrderSuccess(successObj);
+      try {
+        localStorage.setItem('mimo_active_order', JSON.stringify(successObj));
+      } catch {
+        // ignore
+      }
+
+      // 6. Limpa o carrinho SOMENTE DEPOIS que o pedido já foi gravado no Supabase e no localStorage
+      setCart([]);
+
+      // 7. Redireciona para o Checkout Pro do Mercado Pago se o link oficial foi gerado
+      if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) {
+        window.location.href = mpCheckoutProUrl;
+      }
+    } finally {
+      setIsSubmittingCheckout(false);
     }
   };
 
@@ -2162,7 +2433,7 @@ export default function App() {
   useEffect(() => {
     if (
       !orderSuccess ||
-      orderSuccess.method !== 'pix' ||
+      (orderSuccess.method !== 'pix' && orderSuccess.method !== 'mercadopago') ||
       orderSuccess.paymentConfirmed
     ) {
       return;
@@ -2191,31 +2462,14 @@ export default function App() {
     const interval = setInterval(async () => {
       setPixCheckCount((c) => c + 1);
 
-      // 1. Verifica na API do Mercado Pago se o PIX Dinâmico foi aprovado pelo banco
-      if (
-        orderSuccess.mpPaymentId &&
-        storeConfig.mercadoPagoAccessToken &&
-        storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
-      ) {
-        try {
-          const mpRes = await fetch(
-            `https://api.mercadopago.com/v1/payments/${orderSuccess.mpPaymentId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`
-              }
-            }
-          );
-          if (mpRes.ok) {
-            const mpData = await mpRes.json();
-            if (mpData.status === 'approved') {
-              await markOrderAsPaidAutomatically();
-              return;
-            }
-          }
-        } catch {
-          // Segue para checagem no Supabase
-        }
+      // 1. Consulta na API do Mercado Pago (por payment_id E por external_reference do Checkout Pro)
+      const mpCheck = await verifyOrderPaymentOnMercadoPago(
+        orderSuccess.code,
+        orderSuccess.mpPaymentId
+      );
+      if (mpCheck && mpCheck.status === 'approved') {
+        await markOrderAsPaidAutomatically();
+        return;
       }
 
       // 2. Verifica na tabela `orders` do Supabase se o status do pedido mudou para "Pago"
@@ -2254,6 +2508,34 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [orderSuccess, supabaseUrl, supabaseKey, storeConfig]);
+
+  // Sincroniza no Painel Admin os pedidos pendentes com a API do Mercado Pago
+  const syncAllPendingOrdersWithMercadoPago = async (silent = false) => {
+    const pendingList = orders.filter(
+      (o) => o.status === 'Aguardando PIX' || o.status === 'Pendente'
+    );
+    if (pendingList.length === 0) {
+      if (!silent) showAdminToast('Não há pedidos pendentes para verificar.');
+      return;
+    }
+
+    let approvedCount = 0;
+    for (const ord of pendingList) {
+      const check = await verifyOrderPaymentOnMercadoPago(ord.id, ord.mpPaymentId);
+      if (check && check.status === 'approved') {
+        await handleUpdateOrderStatus(ord.id, 'Pago');
+        approvedCount++;
+      }
+    }
+
+    if (!silent) {
+      if (approvedCount > 0) {
+        showAdminToast(`${approvedCount} pedido(s) confirmado(s) como PAGO pelo Mercado Pago!`);
+      } else {
+        showAdminToast('Status verificado no Mercado Pago (nenhum novo pagamento aprovado ainda).');
+      }
+    }
+  };
 
   // Funções do Painel Admin (CRUD de Produtos + Pedidos)
   const handleAdminUnlock = (e) => {
@@ -2756,14 +3038,32 @@ export default function App() {
             {/* ABA 2: CENTRAL DE PEDIDOS */}
             {adminTab === 'orders' && (
               <div className="space-y-4">
-                <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0] flex items-center justify-between">
+                <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
                       Pedidos Recebidos ({orders.length})
                     </h2>
                     <p className="text-xs text-[#795344]">
-                      Acompanhe os pedidos feitos no Checkout e avise o cliente pelo WhatsApp.
+                      Todos os pedidos ficam salvos no Supabase e você pode validar pagamentos do Mercado Pago em tempo real.
                     </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => syncAllPendingOrdersWithMercadoPago(false)}
+                      className="px-3.5 py-2 rounded-full bg-[#009EE3] hover:bg-[#0082BD] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Verificar Pagamentos Mercado Pago</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fetchFromSupabase(false)}
+                      className="px-3.5 py-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#E5CFC9] text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Recarregar do Supabase</span>
+                    </button>
                   </div>
                 </div>
 
@@ -3047,7 +3347,7 @@ export default function App() {
                   />
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setChatMessages([
                       {
                         id: `welcome-${Date.now()}`,
@@ -3056,11 +3356,12 @@ export default function App() {
                         time: 'Agora'
                       }
                     ]);
-                    showAdminToast('Configurações atualizadas com sucesso!');
+                    await syncStoreConfigToSupabase(storeConfig);
+                    showAdminToast('Configurações salvas no navegador e na nuvem Supabase!');
                   }}
                   className="px-5 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
                 >
-                  Salvar Configurações
+                  Salvar Configurações (Sincronizar em Todos os Dispositivos)
                 </button>
               </div>
             )}
@@ -4743,13 +5044,16 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition ${
+                        disabled={isSubmittingCheckout}
+                        className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 ${
                           checkoutData.paymentMethod === 'mercadopago'
                             ? 'bg-[#009EE3] hover:bg-[#0082BD]'
                             : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'
                         }`}
                       >
-                        {checkoutData.paymentMethod === 'mercadopago'
+                        {isSubmittingCheckout
+                          ? 'Salvando pedido e conectando ao Mercado Pago...'
+                          : checkoutData.paymentMethod === 'mercadopago'
                           ? `Pagar com Checkout Pro Mercado Pago • ${formatBRL(cartTotal)}`
                           : checkoutData.paymentMethod === 'pix'
                           ? `Gerar QR Code PIX • ${formatBRL(cartTotal)}`
