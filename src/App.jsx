@@ -1041,6 +1041,8 @@ export default function App() {
             whatsappNumber: '5554999999999',
             pixKey: '5554999999999',
             pixHolderName: 'Mimo Rosas Artesanal',
+            mercadoPagoAccessToken: '',
+            autoApproveDemoSeconds: 0,
             freeShippingMin: 120,
             defaultShippingFee: 14.9,
             hideTopAdminBar: false,
@@ -1053,6 +1055,8 @@ export default function App() {
         whatsappNumber: '5554999999999',
         pixKey: '5554999999999',
         pixHolderName: 'Mimo Rosas Artesanal',
+        mercadoPagoAccessToken: '',
+        autoApproveDemoSeconds: 0,
         freeShippingMin: 120,
         defaultShippingFee: 14.9,
         hideTopAdminBar: false,
@@ -1131,6 +1135,7 @@ export default function App() {
     cardCvv: ''
   });
   const [orderSuccess, setOrderSuccess] = useState(null);
+  const [pixCheckCount, setPixCheckCount] = useState(0);
 
   // Assistente Virtual
   const [chatMessages, setChatMessages] = useState([
@@ -1187,6 +1192,35 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       if (params.get('admin') === '1') {
         setAppMode('admin');
+      }
+    } catch {
+      // ignora
+    }
+  }, []);
+
+  // Retorno automático do Checkout Pro do Mercado Pago (?mp_status=approved&external_reference=MR-12345)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const mpStatus = params.get('collection_status') || params.get('status') || params.get('mp_status');
+      const orderRef = params.get('external_reference') || params.get('order_id');
+
+      if (mpStatus === 'approved' && orderRef) {
+        setActiveView('checkout');
+        handleUpdateOrderStatus(orderRef, 'Pago');
+        setOrderSuccess({
+          code: orderRef,
+          customer: 'Cliente Mimo Rosas',
+          total: 0,
+          method: 'mercadopago',
+          delivery: 'delivery',
+          paymentConfirmed: true,
+          whatsappUrl: `https://wa.me/${(
+            storeConfig.whatsappNumber || '5554999999999'
+          ).replace(/\D/g, '')}?text=${encodeURIComponent(
+            `Olá Mimo Rosas! 🌹 Meu pagamento no Checkout Pro Mercado Pago para o pedido *${orderRef}* acabou de ser aprovado!`
+          )}`
+        });
       }
     } catch {
       // ignora
@@ -1965,13 +1999,124 @@ export default function App() {
     // 3. Salva o pedido diretamente no Supabase
     await syncNewOrderToSupabase(newOrder);
 
-    const pixCode = generatePixCopyPaste(
+    let pixCode = generatePixCopyPaste(
       storeConfig.pixKey || storeConfig.whatsappNumber,
       storeConfig.pixHolderName || 'MIMO ROSAS',
       'BRASIL',
       cartTotal,
       code.replace(/[^A-Z0-9]/g, '')
     );
+    let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
+      pixCode
+    )}`;
+    let mpPaymentId = null;
+    let mpCheckoutProUrl = null;
+
+    // 4. Integração Checkout Pro do Mercado Pago (Preference API) - Cria link oficial com PIX + Cartão + Retorno Automático
+    if (
+      storeConfig.mercadoPagoAccessToken &&
+      storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
+    ) {
+      try {
+        const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
+        const mpItems = cart.map((item) => ({
+          id: item.id,
+          title: `${item.name} (${item.variation})`,
+          quantity: Number(item.quantity),
+          currency_id: 'BRL',
+          unit_price: Number(Number(item.price).toFixed(2))
+        }));
+
+        if (shippingFee > 0) {
+          mpItems.push({
+            id: 'frete',
+            title: 'Frete / Entrega Mimo Rosas',
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: Number(Number(shippingFee).toFixed(2))
+          });
+        }
+
+        const prefRes = await fetch(
+          'https://api.mercadopago.com/checkout/preferences',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              items: mpItems,
+              payer: {
+                name: checkoutData.name,
+                phone: {
+                  number: checkoutData.phone.replace(/\D/g, '')
+                }
+              },
+              external_reference: code,
+              back_urls: {
+                success: `${currentOrigin}/?mp_status=approved&external_reference=${code}`,
+                pending: `${currentOrigin}/?mp_status=pending&external_reference=${code}`,
+                failure: `${currentOrigin}/?mp_status=failure&external_reference=${code}`
+              },
+              auto_return: 'approved',
+              statement_descriptor: 'MIMOROSAS'
+            })
+          }
+        );
+
+        if (prefRes.ok) {
+          const prefData = await prefRes.json();
+          if (prefData.init_point) {
+            mpCheckoutProUrl = prefData.init_point;
+          }
+        }
+      } catch {
+        // Fallback para QR Code direto
+      }
+    }
+
+    // 5. Se escolheu PIX direto e tem Token Mercado Pago, também tenta gerar QR Code dinâmico na tela
+    if (
+      checkoutData.paymentMethod === 'pix' &&
+      storeConfig.mercadoPagoAccessToken &&
+      storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
+    ) {
+      try {
+        const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`,
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': `${code}-${Date.now()}`
+          },
+          body: JSON.stringify({
+            transaction_amount: Number(cartTotal.toFixed(2)),
+            description: `Pedido ${code} - Mimo Rosas`,
+            payment_method_id: 'pix',
+            payer: {
+              email: 'cliente@mimorosas.com.br',
+              first_name: checkoutData.name.split(' ')[0] || 'Cliente'
+            }
+          })
+        });
+        if (mpRes.ok) {
+          const mpData = await mpRes.json();
+          const txData = mpData?.point_of_interaction?.transaction_data;
+          if (txData?.qr_code) {
+            pixCode = txData.qr_code;
+            qrCodeUrl = txData.qr_code_base64
+              ? `data:image/png;base64,${txData.qr_code_base64}`
+              : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
+                  pixCode
+                )}`;
+            mpPaymentId = mpData.id;
+          }
+        }
+      } catch {
+        // Em caso de bloqueio CORS do navegador, mantém o QR Code BR Code padrão e monitora via Supabase
+      }
+    }
 
     const itemsSummaryText = newOrder.items
       .map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`)
@@ -1986,20 +2131,129 @@ export default function App() {
       `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
       `*Total:* ${formatBRL(cartTotal)}`;
 
+    setPixCheckCount(0);
     setOrderSuccess({
       code,
       customer: checkoutData.name,
       total: cartTotal,
       method: checkoutData.paymentMethod,
       delivery: checkoutData.deliveryMethod,
+      paymentConfirmed: checkoutData.paymentMethod === 'card',
+      mpPaymentId,
+      mpCheckoutProUrl,
       pixCode,
+      qrCodeUrl,
       whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(
         /\D/g,
         ''
       )}?text=${encodeURIComponent(waMessage)}`
     });
     setCart([]);
+
+    // Se o cliente escolheu Checkout Pro Mercado Pago e o link foi gerado, redireciona automaticamente!
+    if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) {
+      window.location.href = mpCheckoutProUrl;
+    }
   };
+
+  // ============================================================================
+  // VERIFICAÇÃO AUTOMÁTICA DE PAGAMENTO PIX EM TEMPO REAL (POLLING 3 SEGUNDOS)
+  // ============================================================================
+  useEffect(() => {
+    if (
+      !orderSuccess ||
+      orderSuccess.method !== 'pix' ||
+      orderSuccess.paymentConfirmed
+    ) {
+      return;
+    }
+
+    const markOrderAsPaidAutomatically = async () => {
+      await handleUpdateOrderStatus(orderSuccess.code, 'Pago');
+      const confirmedWaText =
+        `Olá Mimo Rosas! 🌹 O sistema já confirmou automaticamente meu pagamento PIX do pedido *${orderSuccess.code}* (${formatBRL(
+          orderSuccess.total
+        )})!\n\n` + `*Cliente:* ${orderSuccess.customer}`;
+
+      setOrderSuccess((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentConfirmed: true,
+              whatsappUrl: `https://wa.me/${(
+                storeConfig.whatsappNumber || '5554999999999'
+              ).replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}`
+            }
+          : null
+      );
+    };
+
+    const interval = setInterval(async () => {
+      setPixCheckCount((c) => c + 1);
+
+      // 1. Verifica na API do Mercado Pago se o PIX Dinâmico foi aprovado pelo banco
+      if (
+        orderSuccess.mpPaymentId &&
+        storeConfig.mercadoPagoAccessToken &&
+        storeConfig.mercadoPagoAccessToken.trim().startsWith('APP_USR-')
+      ) {
+        try {
+          const mpRes = await fetch(
+            `https://api.mercadopago.com/v1/payments/${orderSuccess.mpPaymentId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${storeConfig.mercadoPagoAccessToken.trim()}`
+              }
+            }
+          );
+          if (mpRes.ok) {
+            const mpData = await mpRes.json();
+            if (mpData.status === 'approved') {
+              await markOrderAsPaidAutomatically();
+              return;
+            }
+          }
+        } catch {
+          // Segue para checagem no Supabase
+        }
+      }
+
+      // 2. Verifica na tabela `orders` do Supabase se o status do pedido mudou para "Pago"
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+          const res = await fetch(
+            `${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(
+              orderSuccess.code
+            )}&select=status`,
+            { headers: sbHeaders() }
+          );
+          if (res.ok) {
+            const rows = await res.json();
+            if (Array.isArray(rows) && rows[0]?.status === 'Pago') {
+              await markOrderAsPaidAutomatically();
+              return;
+            }
+          }
+        } catch {
+          // ignora falha de rede momentânea
+        }
+      }
+
+      // 3. Simulador opcional de aprovação automática (caso ativado no Painel Admin para testes)
+      const demoSecs = Number(storeConfig.autoApproveDemoSeconds || 0);
+      if (demoSecs > 0) {
+        setPixCheckCount((currentCount) => {
+          if (currentCount * 3 >= demoSecs) {
+            markOrderAsPaidAutomatically();
+          }
+          return currentCount;
+        });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [orderSuccess, supabaseUrl, supabaseKey, storeConfig]);
 
   // Funções do Painel Admin (CRUD de Produtos + Pedidos)
   const handleAdminUnlock = (e) => {
@@ -2690,6 +2944,71 @@ export default function App() {
                       }
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
+                  </div>
+                </div>
+
+                {/* CONFIGURAÇÃO DE CONFIRMAÇÃO AUTOMÁTICA DO PIX (MERCADO PAGO + SUPABASE + TESTE) */}
+                <div className="p-4 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-[#4A2532] flex items-center gap-1.5">
+                      <QrCode className="w-4 h-4 text-[#A90F4D]" />
+                      <span>Baixa Automática de PIX (Sem o cliente precisar confirmar)</span>
+                    </p>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                      Verificação a cada 3s
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold mb-1 text-[#4A2532]">
+                        Access Token Mercado Pago (Opcional • PIX Dinâmico Real)
+                      </label>
+                      <input
+                        type="password"
+                        value={storeConfig.mercadoPagoAccessToken || ''}
+                        onChange={(e) =>
+                          setStoreConfig({
+                            ...storeConfig,
+                            mercadoPagoAccessToken: e.target.value
+                          })
+                        }
+                        placeholder="APP_USR-0000000000000000-..."
+                        className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[11px]"
+                      />
+                      <p className="text-[10.5px] text-[#795344] mt-1">
+                        Quando preenchido, consulta o banco sozinho e aprova na tela do cliente assim que o PIX é pago.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1 text-[#4A2532]">
+                        Tempo de Auto-Confirmação p/ Testes (0 = Desativado)
+                      </label>
+                      <select
+                        value={Number(storeConfig.autoApproveDemoSeconds || 0)}
+                        onChange={(e) =>
+                          setStoreConfig({
+                            ...storeConfig,
+                            autoApproveDemoSeconds: Number(e.target.value)
+                          })
+                        }
+                        className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9]"
+                      >
+                        <option value={0}>
+                          Apenas Real (Mercado Pago ou Status &quot;Pago&quot; no Supabase/Admin)
+                        </option>
+                        <option value={9}>
+                          Modo Teste: Aprovar automaticamente após 9 segundos
+                        </option>
+                        <option value={15}>
+                          Modo Teste: Aprovar automaticamente após 15 segundos
+                        </option>
+                      </select>
+                      <p className="text-[10.5px] text-[#795344] mt-1">
+                        Mesmo em &quot;Apenas Real&quot;, se você mudar o pedido para <strong>Pago</strong> na aba Pedidos, a tela do cliente aprova sozinha em 3s!
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -4038,65 +4357,118 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            )}
+                      <div className="flex justify-center">
+                        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold animate-pulse">
+                          <QrCode className="w-4 h-4 text-amber-700" />
+                          Aguardando Pagamento • Pedido #{orderSuccess.code}
+                        </span>
+                      </div>
+                    )}
 
-            {/* VIEW: CHECKOUT */}
-            {activeView === 'checkout' && (
-              <div className="px-3.5 py-4 space-y-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveView('home')}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#A90F4D]"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Continuar comprando</span>
-                </button>
-
-                <h1 className="font-serif-display text-2xl text-[#4A2532] font-bold">
-                  Finalizar Pedido
-                </h1>
-
-                {orderSuccess ? (
-                  <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EBD5CF] text-center space-y-4 shadow-sm">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                      <Check className="w-8 h-8 stroke-[2.5]" />
-                    </div>
                     <h2 className="font-serif-display text-2xl text-[#4A2532] font-bold">
-                      Pedido Registrado com Carinho! 🌹
+                      {orderSuccess.paymentConfirmed
+                        ? 'Pagamento Confirmado com Sucesso! 🌹'
+                        : orderSuccess.mpCheckoutProUrl
+                        ? 'Pague com Segurança no Checkout Pro Mercado Pago 🌹'
+                        : 'Escaneie o QR Code PIX para Pagar 🌹'}
                     </h2>
+
                     <p className="text-xs text-[#795344] max-w-md mx-auto">
                       Obrigada, <strong>{orderSuccess.customer}</strong>! Seu pedido{' '}
-                      <strong className="text-[#A90F4D]">{orderSuccess.code}</strong> no valor de{' '}
-                      <strong>{formatBRL(orderSuccess.total)}</strong> foi registrado.
+                      <strong className="text-[#A90F4D]">{orderSuccess.code}</strong>{' '}
+                      {orderSuccess.total > 0 && (
+                        <>
+                          no valor de <strong>{formatBRL(orderSuccess.total)}</strong>{' '}
+                        </>
+                      )}
+                      já está salvo no sistema.
                     </p>
 
-                    {orderSuccess.method === 'pix' && orderSuccess.pixCode && (
-                      <div className="bg-[#F6E9E5] p-4 rounded-2xl border border-[#DFC3BC] max-w-md mx-auto text-left space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-[#A90F4D] flex items-center gap-1.5">
-                            <QrCode className="w-4 h-4" />
-                            PIX Copia e Cola ({formatBRL(orderSuccess.total)})
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              safeCopyText(orderSuccess.pixCode, 'Código PIX Copia e Cola')
-                            }
-                            className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1"
-                          >
-                            <Copy className="w-3 h-3" /> Copiar PIX
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          readOnly
-                          value={orderSuccess.pixCode}
-                          onClick={(e) => e.target.select()}
-                          className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[10px] text-[#4A2532]"
-                        />
-                        <p className="text-[11px] text-[#795344]">
-                          Chave PIX: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong>
+                    {/* BOTÃO OFICIAL DO CHECKOUT PRO MERCADO PAGO (QUANDO ATIVO) */}
+                    {!orderSuccess.paymentConfirmed && orderSuccess.mpCheckoutProUrl && (
+                      <div className="bg-[#F0F8FF] p-4 rounded-3xl border-2 border-[#009EE3] max-w-md mx-auto space-y-2.5">
+                        <p className="text-xs font-bold text-[#005B8F]">
+                          Ambiente Oficial Mercado Pago (PIX Instantâneo, Cartão ou Saldo Mercado Livre)
                         </p>
+                        <a
+                          href={orderSuccess.mpCheckoutProUrl}
+                          className="w-full py-3.5 px-5 rounded-full bg-[#009EE3] hover:bg-[#0082BD] text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition"
+                        >
+                          <ShieldCheck className="w-5 h-5" />
+                          <span>Pagar Agora no Checkout Pro Mercado Pago →</span>
+                        </a>
+                        <p className="text-[11px] text-[#005B8F]">
+                          Assim que você pagar lá, o Mercado Pago te traz de volta para cá com o pedido aprovado automaticamente!
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ÁREA DO QR CODE + COPIA E COLA + CONFIRMAÇÃO */}
+                    {(orderSuccess.method === 'pix' || orderSuccess.method === 'mercadopago') &&
+                      orderSuccess.pixCode && (
+                      <div className="bg-[#F6E9E5] p-4 sm:p-5 rounded-3xl border border-[#DFC3BC] max-w-md mx-auto space-y-3.5">
+                        {!orderSuccess.paymentConfirmed ? (
+                          <>
+                            <div className="bg-white p-3.5 rounded-2xl border-2 border-[#A90F4D] w-52 h-52 mx-auto flex flex-col items-center justify-center shadow-md">
+                              <img
+                                src={orderSuccess.qrCodeUrl}
+                                alt="QR Code PIX Mimo Rosas"
+                                className="w-44 h-44 object-contain"
+                              />
+                            </div>
+
+                            <p className="text-[11px] text-[#5A382E] font-medium">
+                              Abra o aplicativo do seu banco, escolha <strong>Ler QR Code PIX</strong> ou copie o código abaixo:
+                            </p>
+
+                            <div className="text-left space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#A90F4D] flex items-center gap-1.5">
+                                  <QrCode className="w-4 h-4" />
+                                  PIX Copia e Cola ({formatBRL(orderSuccess.total)})
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    safeCopyText(orderSuccess.pixCode, 'Código PIX Copia e Cola')
+                                  }
+                                  className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs"
+                                >
+                                  <Copy className="w-3 h-3" /> Copiar Código PIX
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                readOnly
+                                value={orderSuccess.pixCode}
+                                onClick={(e) => e.target.select()}
+                                className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[10px] text-[#4A2532]"
+                              />
+                              <p className="text-[11px] text-[#795344] text-center pt-0.5">
+                                Recebedor: <strong>{storeConfig.pixHolderName || 'Mimo Rosas'}</strong> • Chave: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong>
+                              </p>
+                            </div>
+
+                            <div className="pt-2 border-t border-[#E5CFC9]">
+                              <div className="w-full py-3 px-4 rounded-2xl bg-[#FFF9F3] border border-[#DFC3BC] text-[#4A2532] text-xs font-semibold flex items-center justify-center gap-2.5 shadow-2xs">
+                                <RefreshCw className="w-4 h-4 text-[#A90F4D] animate-spin shrink-0" />
+                                <span>
+                                  Aguardando confirmação automática do banco... (verificando em tempo real)
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-2">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                            <p className="text-sm font-bold">
+                              Pagamento PIX identificado automaticamente!
+                            </p>
+                            <p className="text-xs text-emerald-800">
+                              O sistema reconheceu o pagamento e o pedido <strong>#{orderSuccess.code}</strong> já está com status <strong>Pago</strong> na Mimo Rosas.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -4108,7 +4480,11 @@ export default function App() {
                           rel="noreferrer"
                           className="px-6 py-3 rounded-full bg-[#25D366] hover:bg-[#1EBE5B] text-white text-xs font-bold shadow-md flex items-center justify-center gap-2"
                         >
-                          <span>Enviar Pedido no WhatsApp da Loja →</span>
+                          <span>
+                            {orderSuccess.paymentConfirmed
+                              ? 'Enviar Comprovante no WhatsApp →'
+                              : 'Enviar Pedido no WhatsApp da Loja →'}
+                          </span>
                         </a>
                       )}
                       <button
@@ -4233,7 +4609,28 @@ export default function App() {
                       <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">
                         3. Pagamento e Resumo ({formatBRL(cartTotal)})
                       </h2>
-                      <div className="grid grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCheckoutData({ ...checkoutData, paymentMethod: 'mercadopago' })
+                          }
+                          className={`p-3 rounded-2xl border flex items-center gap-2 ${
+                            checkoutData.paymentMethod === 'mercadopago'
+                              ? 'border-[#009EE3] bg-[#F0F9FF]'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5]'
+                          }`}
+                        >
+                          <ShieldCheck className="w-5 h-5 text-[#009EE3] shrink-0" />
+                          <div className="text-left">
+                            <span className="text-xs font-bold block text-[#005B8F]">
+                              Checkout Pro
+                            </span>
+                            <span className="text-[10px] text-[#795344]">
+                              Mercado Pago (PIX/Cartão)
+                            </span>
+                          </div>
+                        </button>
                         <button
                           type="button"
                           onClick={() =>
@@ -4245,8 +4642,8 @@ export default function App() {
                               : 'border-[#E5CFC9] bg-[#F6E9E5]'
                           }`}
                         >
-                          <QrCode className="w-5 h-5 text-[#A90F4D]" />
-                          <span className="text-xs font-bold">PIX Instantâneo</span>
+                          <QrCode className="w-5 h-5 text-[#A90F4D] shrink-0" />
+                          <span className="text-xs font-bold">PIX com QR Code</span>
                         </button>
                         <button
                           type="button"
@@ -4259,16 +4656,75 @@ export default function App() {
                               : 'border-[#E5CFC9] bg-[#F6E9E5]'
                           }`}
                         >
-                          <CreditCard className="w-5 h-5 text-[#A90F4D]" />
+                          <CreditCard className="w-5 h-5 text-[#A90F4D] shrink-0" />
                           <span className="text-xs font-bold">Cartão de Crédito</span>
                         </button>
                       </div>
 
+                      {checkoutData.paymentMethod === 'card' && (
+                        <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] space-y-2.5 animate-fadeIn">
+                          <p className="text-[11px] font-bold text-[#A90F4D] flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4" />
+                            Dados do Cartão (Ambiente Demonstrativo Seguro)
+                          </p>
+                          <input
+                            type="text"
+                            required
+                            value={checkoutData.cardNumber}
+                            onChange={(e) =>
+                              setCheckoutData({ ...checkoutData, cardNumber: e.target.value })
+                            }
+                            placeholder="Número do Cartão (0000 0000 0000 0000) *"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs"
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              required
+                              value={checkoutData.cardHolder}
+                              onChange={(e) =>
+                                setCheckoutData({ ...checkoutData, cardHolder: e.target.value })
+                              }
+                              placeholder="Nome no Cartão *"
+                              className="col-span-1 px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs"
+                            />
+                            <input
+                              type="text"
+                              required
+                              value={checkoutData.cardExpiry}
+                              onChange={(e) =>
+                                setCheckoutData({ ...checkoutData, cardExpiry: e.target.value })
+                              }
+                              placeholder="MM/AA *"
+                              className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs"
+                            />
+                            <input
+                              type="text"
+                              required
+                              value={checkoutData.cardCvv}
+                              onChange={(e) =>
+                                setCheckoutData({ ...checkoutData, cardCvv: e.target.value })
+                              }
+                              placeholder="CVV *"
+                              className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       <button
                         type="submit"
-                        className="w-full py-3.5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm shadow-lg"
+                        className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition ${
+                          checkoutData.paymentMethod === 'mercadopago'
+                            ? 'bg-[#009EE3] hover:bg-[#0082BD]'
+                            : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'
+                        }`}
                       >
-                        Confirmar Pedido • {formatBRL(cartTotal)}
+                        {checkoutData.paymentMethod === 'mercadopago'
+                          ? `Pagar com Checkout Pro Mercado Pago • ${formatBRL(cartTotal)}`
+                          : checkoutData.paymentMethod === 'pix'
+                          ? `Gerar QR Code PIX • ${formatBRL(cartTotal)}`
+                          : `Pagar com Cartão • ${formatBRL(cartTotal)}`}
                       </button>
                     </div>
                   </form>
