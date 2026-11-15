@@ -9,23 +9,24 @@ import {
   LayoutGrid,
   ChevronRight,
   ChevronLeft,
+  Star,
   Plus,
   Minus,
   Trash2,
   X,
-  Star,
-  Sparkles,
   Check,
+  Sparkles,
+  Send,
   MapPin,
   Truck,
   Store,
   CreditCard,
   QrCode,
-  Send,
-  ArrowRight,
   ShieldCheck,
-  Package,
+  SlidersHorizontal,
   Settings,
+  Package,
+  ClipboardList,
   Database,
   Bot,
   Edit3,
@@ -35,66 +36,77 @@ import {
   Lock,
   CheckCircle2,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Upload,
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 
 // ============================================================================
-// CONFIGURAÇÃO OFICIAL DO SUPABASE (PRÉ-CONECTADO AO SEU PROJETO)
+// CONFIGURAÇÃO DO SUPABASE PRÉ-CONECTADA AO PROJETO DA MIMO ROSAS
 // ============================================================================
 const DEFAULT_SUPABASE_URL = 'https://dktpnqekuxtsqmazelox.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'sb_publishable_7WyhLNtUeEMNnbE_MyTo2g_IYrCA8AU';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_7WyhLNtUeEMNnbE_MyTo2g_IYrCA8AU';
 
 // ============================================================================
-// DADOS INICIAIS: 8 CATEGORIAS E 16 PRODUTOS DEMONSTRATIVOS
+// DADOS INICIAIS (SINCRONIZADOS ENTRE LOJA E PAINEL ADMIN)
 // ============================================================================
 const INITIAL_CATEGORIES = [
   {
     id: 'infusoes',
     name: 'Infusões para Chimarrão, Drinks e Tererê',
     shortName: 'Infusões para Chimarrão, Drinks e Tererê',
-    icon: 'cuia'
+    iconType: 'cuia',
+    description: 'Pétalas, especiarias e frutas desidratadas para transformar seu ritual.'
   },
   {
     id: 'blend',
     name: 'Blend para Chimarrão',
     shortName: 'Blend para Chimarrão',
-    icon: 'leaf'
+    iconType: 'leaves',
+    description: 'Combinações autorais de ervas aromáticas e flores selecionadas.'
   },
   {
     id: 'capsulas-cafe',
     name: 'Cápsulas de Café',
     shortName: 'Cápsulas de Café',
-    icon: 'bean'
+    iconType: 'coffee-bean',
+    description: 'Cafés especiais com notas florais, caramelo e chocolate.'
   },
   {
     id: 'capsulas-cha',
     name: 'Cápsulas de Chá',
     shortName: 'Cápsulas de Chá',
-    icon: 'teacup'
+    iconType: 'tea-cup',
+    description: 'Cápsulas artesanais em formato de rosa que desabrocham na xícara.'
   },
   {
     id: 'enfeites',
     name: 'Enfeites de Cuia',
     shortName: 'Enfeites de Cuia',
-    icon: 'gift'
+    iconType: 'gift',
+    description: 'Detalhes delicados em resina, pérolas e flores para decorar seu mate.'
   },
   {
-    id: 'cuias-resinadas',
+    id: 'cuias',
     name: 'Cuias Resinadas',
     shortName: 'Cuias Resinadas',
-    icon: 'sparkles'
+    iconType: 'cuia-resin',
+    description: 'Cuias exclusivas revestidas à mão com acabamento em resina.'
   },
   {
     id: 'chaveiros',
     name: 'Chaveiros em Resina',
     shortName: 'Chaveiros em Resina',
-    icon: 'keychain'
+    iconType: 'keychain',
+    description: 'Lembranças afetivas com iniciais, pétalas naturais e folha de ouro.'
   },
   {
     id: 'bombas',
     name: 'Bombas de Chimarrão Personalizadas',
     shortName: 'Bombas Personalizadas',
-    icon: 'bomba'
+    iconType: 'bomba',
+    description: 'Bombas em inox e banhadas com pingentes e pedrarias exclusivas.'
   }
 ];
 
@@ -103,354 +115,502 @@ const INITIAL_PRODUCTS = [
     id: 'prod-1',
     name: 'Infusões para Chimarrão, Drinks e Tererê',
     category: 'infusoes',
-    price: 24.90,
-    stock: 28,
+    price: 24.9,
+    stock: 32,
     badge: 'Mais Vendido',
     badgeType: 'star',
     featured: true,
     active: true,
-    image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85',
+    rating: 4.9,
+    reviews: 128,
+    image:
+      'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85',
-      'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85',
+      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Rosas & Hibisco (50g)', 'Frutas Vermelhas (50g)', 'Cítrico Floral (50g)'],
+    variations: ['Rosas & Hibisco (50g)', 'Cítrico Imperial (50g)', 'Maçã & Canela (50g)'],
     description:
-      'Mix artesanal selecionado com pétalas de rosas rubras, hibisco em flor e especiarias aromáticas. Perfeito para transformar seu chimarrão, tererê ou drinks autorais em uma experiência sensorial inesquecível.'
+      'Mix artesanal de botões de rosas rubras, hibisco selecionado, cascas de laranja doce e especiarias. Perfeito para decorar e aromatizar seu chimarrão, tererê ou criar drinks autorais.'
   },
   {
     id: 'prod-2',
     name: 'Cápsulas de Chá – Rosa',
     category: 'capsulas-cha',
-    price: 19.90,
-    stock: 35,
+    price: 19.9,
+    stock: 45,
     badge: 'Novo',
     badgeType: 'leaf',
     featured: true,
     active: true,
-    image: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
+    rating: 5.0,
+    reviews: 94,
+    image:
+      'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
     gallery: [
       'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
       'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Rosa Damascena & Baunilha (2 un.)', 'Rosa & Morango Silvestre (2 un.)', 'Rosa & Camomila (2 un.)'],
+    variations: ['Caixa com 2 Rosas', 'Caixa Presente com 4 Rosas'],
     description:
-      'Cápsulas artesanais esculpidas em formato de rosa que se dissolvem delicadamente na água quente ou no chimarrão, liberando pétalas naturais, aroma envolvente e um sabor suave e acolhedor.'
+      'Nossas icônicas rosas artesanais de chá! Moldadas delicadamente à mão com pétalas comestíveis, ervas aromáticas e brilho perolado próprio para infusão.'
   },
   {
     id: 'prod-3',
-    name: 'Blend para Chimarrão – Jardim Imperial',
+    name: 'Blend para Chimarrão – Jardim de Rosas',
     category: 'blend',
-    price: 22.90,
+    price: 22.9,
     stock: 20,
-    badge: 'Mais Vendido',
-    badgeType: 'star',
+    badge: 'Artesanal',
+    badgeType: 'leaf',
     featured: true,
     active: true,
-    image: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85',
+    rating: 4.9,
+    reviews: 67,
+    image:
+      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85'
     ],
     variations: ['Pote 60g', 'Refil 100g'],
     description:
-      'Combinação equilibrada de camomila, anis-estrelado, capim-limão e botões de rosa. Traz leveza e perfume ao seu mate diário sem roubar o protagonismo da erva-mate.'
+      'Combinação suave de camomila, erva-doce, capim-limão e pétalas de rosas cor-de-rosa. Deixa o seu mate leve, perfumado e com visual encantador.'
   },
   {
     id: 'prod-4',
-    name: 'Cuia Resinada – Coleção Rosé Gold',
-    category: 'cuias-resinadas',
-    price: 119.90,
+    name: 'Cuia Resinada Quartzo Rosa & Ouro',
+    category: 'cuias',
+    price: 119.9,
     stock: 8,
     badge: 'Exclusivo',
     badgeType: 'star',
     featured: true,
     active: true,
-    image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=85',
+    rating: 5.0,
+    reviews: 52,
+    image:
+      'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Rosé com Folhas de Ouro', 'Branco Perolado & Framboesa'],
+    variations: ['Rosa Porcelana', 'Framboesa Imperial'],
     description:
-      'Porongo natural selecionado de alta densidade com acabamento artístico em resina cristal, pigmentos perolados rosé e folhas douradas aplicadas manualmente.'
+      'Cuia de porongo selecionado revestida artesanalmente em resina epóxi de alto brilho, com efeito marmorizado quartzo rosa e detalhes em folha de ouro.'
   },
   {
     id: 'prod-5',
-    name: 'Cápsulas de Café – Caramelo & Especiarias',
+    name: 'Cápsulas de Café Gourmet – Flor de Baunilha',
     category: 'capsulas-cafe',
-    price: 26.90,
-    stock: 22,
-    badge: 'Novo',
-    badgeType: 'leaf',
+    price: 28.9,
+    stock: 26,
+    badge: 'Edição Especial',
+    badgeType: 'star',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=900&q=85',
+    rating: 4.8,
+    reviews: 41,
+    image:
+      'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=900&q=85',
     gallery: [
       'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Caixa com 4 Rosas de Café', 'Caixa com 8 Rosas de Café'],
+    variations: ['Caixa c/ 10 Cápsulas (Compatível Nespresso)'],
     description:
-      'Esferas florais de café arábica especial combinadas com notas de caramelo salgado, canela do Ceilão e cacau. Basta adicionar leite quente ou água.'
+      'Café 100% Arábica de torra média com notas naturais de baunilha, caramelo e toque floral aveludado.'
   },
   {
     id: 'prod-6',
-    name: 'Enfeite de Cuia em Resina – Rosa Eterna',
+    name: 'Kit Enfeites de Cuia – Rosa & Pérola',
     category: 'enfeites',
-    price: 18.90,
-    stock: 40,
-    badge: 'Artesanal',
+    price: 18.5,
+    stock: 38,
+    badge: 'Delicado',
     badgeType: 'leaf',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=900&q=85',
+    rating: 4.9,
+    reviews: 83,
+    image:
+      'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=900&q=85',
     gallery: [
       'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Rosa Framboesa', 'Rosa Porcelana com Glitter Dourado'],
+    variations: ['Kit 3 Enfeites Rosé', 'Kit 3 Enfeites Framboesa'],
     description:
-      'Enfeite delicado com pino inoxidável próprio para decorar o seu chimarrão com elegância e personalidade.'
+      'Trio de enfeites modelados em resina com mini rosas esculpidas, ponto de luz e acabamento perolado para deixar seu chimarrão único.'
   },
   {
     id: 'prod-7',
-    name: 'Chaveiro em Resina – Inicial com Pétalas Reais',
+    name: 'Chaveiro em Resina Inicial com Pétalas Reais',
     category: 'chaveiros',
-    price: 29.90,
+    price: 26.9,
     stock: 30,
-    badge: 'Presente',
+    badge: 'Presenteável',
     badgeType: 'star',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=900&q=85',
+    rating: 5.0,
+    reviews: 112,
+    image:
+      'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=900&q=85',
     gallery: [
       'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Letra A–M (informar no pedido)', 'Letra N–Z (informar no pedido)'],
+    variations: ['Letra A–M (Dourado)', 'Letra N–Z (Rosé Gold)', 'Formato Coração'],
     description:
-      'Chaveiro personalizado em resina epóxi cristalina eternizando pétalas de rosas desidratadas e flocos dourados, acompanhado de pingente em tassel de seda.'
+      'Chaveiro artesanal eternizado em resina cristal com pétalas de rosas naturais desidratadas, flocos de ouro e tassel de seda.'
   },
   {
     id: 'prod-8',
-    name: 'Bomba de Chimarrão Personalizada – Joia Rosé',
+    name: 'Bomba de Chimarrão Inox Rosé com Pedra Quartzo',
     category: 'bombas',
-    price: 89.90,
+    price: 64.9,
     stock: 14,
-    badge: 'Premium',
-    badgeType: 'star',
-    featured: false,
-    active: true,
-    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=85',
-    gallery: [
-      'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=85'
-    ],
-    variations: ['21cm Inox c/ Pedra Quartzo Rosa', '23cm Inox c/ Pingente Rosa'],
-    description:
-      'Bomba em aço inox 304 cirúrgico (não enferruja e não transfere gosto) com anel cravejado artesanalmente e pedra natural.'
-  },
-  {
-    id: 'prod-9',
-    name: 'Infusão Tropical para Tererê & Gin – Hibisco & Maçã',
-    category: 'infusoes',
-    price: 24.90,
-    stock: 25,
-    badge: '',
-    badgeType: 'leaf',
-    featured: false,
-    active: true,
-    image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=85',
-    gallery: [
-      'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=85'
-    ],
-    variations: ['Lata Presenteável 55g', 'Pacote Zip 50g'],
-    description:
-      'Frescor cítrico e frutado com maçã desidratada, hibisco, casca de laranja doce e pétalas de rosa. Ideal para infusões geladas e drinks botânicos.'
-  },
-  {
-    id: 'prod-10',
-    name: 'Blend para Chimarrão – Doce Aconchego',
-    category: 'blend',
-    price: 21.90,
-    stock: 19,
-    badge: '',
-    badgeType: 'leaf',
-    featured: false,
-    active: true,
-    image: 'https://images.unsplash.com/photo-1563822249548-9a72b6353cd1?auto=format&fit=crop&w=900&q=85',
-    gallery: [
-      'https://images.unsplash.com/photo-1563822249548-9a72b6353cd1?auto=format&fit=crop&w=900&q=85'
-    ],
-    variations: ['Pote 60g'],
-    description:
-      'Mix suave de erva-doce, cidreira, camomila selecionada e coco em flocos finos para um chimarrão leve no fim da tarde.'
-  },
-  {
-    id: 'prod-11',
-    name: 'Cápsulas de Café – Avelã & Chocolate Belga',
-    category: 'capsulas-cafe',
-    price: 27.90,
-    stock: 15,
-    badge: '',
-    badgeType: 'star',
-    featured: false,
-    active: true,
-    image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=85',
-    gallery: [
-      'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=85'
-    ],
-    variations: ['Caixa com 4 unidades'],
-    description:
-      'Cápsulas solúveis gourmet em formato de botão de rosa com aroma intenso de avelã tostada e cacau nobre.'
-  },
-  {
-    id: 'prod-12',
-    name: 'Cápsulas de Chá – Lavanda & Mel Silvestre',
-    category: 'capsulas-cha',
-    price: 19.90,
-    stock: 28,
-    badge: '',
-    badgeType: 'leaf',
-    featured: false,
-    active: true,
-    image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=900&q=85',
-    gallery: [
-      'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=900&q=85'
-    ],
-    variations: ['Kit 2 Rosas Relaxantes'],
-    description:
-      'Infusão calmante em cápsula floral de isomalte natural com flores de lavanda francesa, melissa e pétalas cor-de-rosa.'
-  },
-  {
-    id: 'prod-13',
-    name: 'Kit 3 Enfeites de Cuia – Jardim de Rosas',
-    category: 'enfeites',
-    price: 44.90,
-    stock: 18,
     badge: 'Mais Vendido',
     badgeType: 'star',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=85',
+    rating: 4.9,
+    reviews: 76,
+    image:
+      'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Trio Clássico (Rosa, Borboleta e Coração)'],
+    variations: ['21cm Bico Torto', '23cm Tradicional'],
     description:
-      'Trio de enfeites modelados à mão com acabamento vitrificado em resina UV e detalhes folheados.'
+      'Bomba em aço inox 304 com acabamento Rosé Gold, anel cravejado com pedra em tom quartzo rosa e bojo desmontável com escovinha.'
   },
   {
-    id: 'prod-14',
-    name: 'Cuia Resinada – Pérola & Pétalas Naturais',
-    category: 'cuias-resinadas',
-    price: 129.90,
-    stock: 6,
+    id: 'prod-9',
+    name: 'Infusão Frutas Vermelhas & Rosas',
+    category: 'infusoes',
+    price: 26.9,
+    stock: 25,
     badge: 'Novo',
     badgeType: 'leaf',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
+    rating: 4.9,
+    reviews: 39,
+    image:
+      'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Bocal Dourado', 'Bocal Inox Polido'],
+    variations: ['Tubo de Vidro 45g', 'Pote Presente 70g'],
     description:
-      'Cuia artesanal revestida com pétalas de rosas verdadeiras encapsuladas em resina de alto brilho.'
+      'Morangos, amoras, mirtilos desidratados e pétalas de rosas. Sabor adocicado e aroma irresistível para gin tônica, chimarrão ou chá gelado.'
   },
   {
-    id: 'prod-15',
-    name: 'Chaveiro Coração em Resina – Mimo de Amor',
-    category: 'chaveiros',
-    price: 26.90,
-    stock: 32,
-    badge: '',
+    id: 'prod-10',
+    name: 'Blend para Chimarrão – Brisa da Manhã',
+    category: 'blend',
+    price: 21.9,
+    stock: 19,
+    badge: null,
+    badgeType: null,
+    featured: false,
+    active: true,
+    rating: 4.8,
+    reviews: 29,
+    image:
+      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=85',
+    gallery: [
+      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=85'
+    ],
+    variations: ['Pote 60g'],
+    description:
+      'Blend refrescante com hortelã-pimenta, Marcela do campo, anis-estrelado e flores de jasmim.'
+  },
+  {
+    id: 'prod-11',
+    name: 'Cápsulas de Café – Avelã & Cacau',
+    category: 'capsulas-cafe',
+    price: 29.9,
+    stock: 22,
+    badge: null,
+    badgeType: null,
+    featured: false,
+    active: true,
+    rating: 4.9,
+    reviews: 34,
+    image:
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=85',
+    gallery: [
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=85'
+    ],
+    variations: ['Caixa c/ 10 Cápsulas'],
+    description:
+      'Espresso encorpado e cremoso com aroma envolvente de avelãs tostadas e fundo de cacau nobre.'
+  },
+  {
+    id: 'prod-12',
+    name: 'Cápsulas de Chá – Rosa Branca & Pêssego',
+    category: 'capsulas-cha',
+    price: 21.9,
+    stock: 30,
+    badge: 'Artesanal',
     badgeType: 'leaf',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=900&q=85',
+    rating: 5.0,
+    reviews: 61,
+    image:
+      'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Com Argola Dourada', 'Com Fecho Lagosta Rosé'],
+    variations: ['Caixa com 2 Rosas'],
     description:
-      'Coração abaulado em resina com minirrosas naturais secas em sílica e folhas de ouro 24k decorativas.'
+      'Cápsula em formato de rosa esculpida com chá branco, pedacinhos de pêssego e pétalas aromáticas.'
   },
   {
-    id: 'prod-16',
-    name: 'Bomba de Chimarrão – Medalhão Mimo Rosas',
-    category: 'bombas',
-    price: 94.90,
-    stock: 11,
-    badge: '',
+    id: 'prod-13',
+    name: 'Enfeite de Cuia Borboleta Cristal Rosé',
+    category: 'enfeites',
+    price: 14.9,
+    stock: 40,
+    badge: null,
+    badgeType: null,
+    featured: false,
+    active: true,
+    rating: 4.9,
+    reviews: 48,
+    image:
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=900&q=85',
+    gallery: [
+      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=900&q=85'
+    ],
+    variations: ['Unidade Rosé', 'Dupla Borboleta + Rosa'],
+    description:
+      'Enfeite de cuia com haste em inox e borboleta em resina translúcida com glitter fino furta-cor.'
+  },
+  {
+    id: 'prod-14',
+    name: 'Cuia Resinada Pérola Imperial Personalizada',
+    category: 'cuias',
+    price: 129.9,
+    stock: 10,
+    badge: 'Personalizável',
     badgeType: 'star',
     featured: false,
     active: true,
-    image: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85',
+    rating: 5.0,
+    reviews: 44,
+    image:
+      'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=900&q=85',
     gallery: [
-      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85'
+      'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=900&q=85'
     ],
-    variations: ['Bojo Redondo Tradicional', 'Bojo Mil Furos Desmontável'],
+    variations: ['Com Inicial Dourada', 'Sem Inicial'],
     description:
-      'Bomba de chimarrão artesanal em aço inox com medalhão central resinado contendo uma rosa em miniatura.'
+      'Cuia artesanal com bocal em inox e acabamento perolado creme e rosa antigo.'
+  },
+  {
+    id: 'prod-15',
+    name: 'Chaveiro Resina Mini Rosa Eternizada',
+    category: 'chaveiros',
+    price: 29.9,
+    stock: 18,
+    badge: 'Novo',
+    badgeType: 'leaf',
+    featured: false,
+    active: true,
+    rating: 5.0,
+    reviews: 57,
+    image:
+      'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=900&q=85',
+    gallery: [
+      'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=900&q=85'
+    ],
+    variations: ['Redondo Dourado', 'Hexagonal Rosé'],
+    description:
+      'Pingente de chaveiro com um botão de rosa real desidratado e preservado dentro da resina cristalina.'
+  },
+  {
+    id: 'prod-16',
+    name: 'Bomba de Chimarrão Banhada Ouro c/ Pingente Rosa',
+    category: 'bombas',
+    price: 79.9,
+    stock: 12,
+    badge: 'Premium',
+    badgeType: 'star',
+    featured: false,
+    active: true,
+    rating: 5.0,
+    reviews: 63,
+    image:
+      'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=900&q=85',
+    gallery: [
+      'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=900&q=85'
+    ],
+    variations: ['19cm', '21cm', '23cm'],
+    description:
+      'Bomba de chimarrão com banho dourado verniz italiano e pingente exclusivo da rosa Mimo Rosas.'
   }
 ];
 
 const INITIAL_ORDERS = [
   {
-    id: 'PED-9041',
-    customerName: 'Mariana Silveira',
-    customerPhone: '(54) 99912-3456',
+    id: 'MR-94821',
+    customerName: 'Carolina Mendes',
+    phone: '(54) 99912-3456',
     deliveryMethod: 'delivery',
-    address: 'Rua das Hortênsias, 420 - Centro',
+    address: 'Rua das Hortênsias, 420 - Gramado/RS',
     cep: '95670-000',
     paymentMethod: 'pix',
     status: 'Pago',
-    total: 64.70,
+    total: 64.7,
     createdAt: 'Hoje, 14:20',
     items: [
-      { id: 'prod-1', name: 'Infusões para Chimarrão, Drinks e Tererê', qty: 1, price: 24.90, variation: 'Rosas & Hibisco (50g)' },
-      { id: 'prod-2', name: 'Cápsulas de Chá – Rosa', qty: 2, price: 19.90, variation: 'Rosa Damascena & Baunilha (2 un.)' }
+      { name: 'Infusões para Chimarrão, Drinks e Tererê', qty: 1, price: 24.9 },
+      { name: 'Cápsulas de Chá – Rosa', qty: 2, price: 19.9 }
     ]
   }
 ];
 
-const SUPABASE_SQL_SCRIPT = `-- 1. Tabela de Categorias Mimo Rosas
+const HERO_SLIDES = [
+  {
+    id: 1,
+    titleLine1: 'Pequenos detalhes,',
+    titleLine2: 'grandes',
+    titleScript: 'momentos.',
+    subtitle: 'Presentes, aromas e sabores para tornar a vida mais especial.',
+    cta: 'Conheça nossos produtos',
+    image:
+      'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
+    targetCategory: 'all'
+  },
+  {
+    id: 2,
+    titleLine1: 'Seu chimarrão com',
+    titleLine2: 'toque de',
+    titleScript: 'poesia.',
+    subtitle: 'Infusões florais, blends selecionados e cuias resinadas feitas à mão.',
+    cta: 'Ver linha Chimarrão',
+    image:
+      'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85',
+    targetCategory: 'infusoes'
+  },
+  {
+    id: 3,
+    titleLine1: 'Presentes que',
+    titleLine2: 'encantam',
+    titleScript: 'corações.',
+    subtitle: 'Cápsulas de chá em formato de rosa e chaveiros personalizados.',
+    cta: 'Escolher um presente',
+    image:
+      'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=900&q=85',
+    targetCategory: 'capsulas-cha'
+  }
+];
+
+// ============================================================================
+// ARQUIVOS PARA CRIAR DIRETO NO SITE DO GITHUB (SEM INSTALAR NADA NO PC)
+// ============================================================================
+const GITHUB_FILES = {
+  packageJson: `{
+  "name": "mimo-rosas-loja",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.1"
+  }
+}`,
+  indexHtml: `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mimo Rosas | Loja Oficial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-[#F6E9E5]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>`,
+  viteConfig: `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()]
+});`,
+  mainJsx: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);`
+};
+
+const SUPABASE_SQL_SCHEMA = `-- ============================================================================
+-- SCRIPT SQL COMPLETO - MIMO ROSAS (SUPABASE + STORAGE DE FOTOS)
+-- Cole este código no menu "SQL Editor" do Supabase e clique em "Run"
+-- ============================================================================
+
+-- 1. Tabela de Categorias
 create table if not exists public.categories (
   id text primary key,
   name text not null,
   short_name text not null,
-  icon text not null
+  icon_type text not null,
+  description text,
+  created_at timestamptz default now()
 );
 
--- 2. Tabela de Produtos Mimo Rosas
+-- 2. Tabela de Produtos
 create table if not exists public.products (
   id text primary key,
   name text not null,
-  category text references public.categories(id),
-  price numeric(10,2) not null,
-  stock integer default 10,
+  category text references public.categories(id) on delete set null,
+  price numeric(10,2) not null default 0,
+  stock integer not null default 0,
   badge text,
   badge_type text default 'star',
   featured boolean default false,
   active boolean default true,
+  rating numeric(3,2) default 5.0,
+  reviews integer default 10,
   image text not null,
+  gallery jsonb default '[]'::jsonb,
+  variations jsonb default '["Padrão"]'::jsonb,
   description text,
-  variations jsonb default '[]'::jsonb,
   created_at timestamptz default now()
 );
 
--- 3. Tabela de Pedidos Mimo Rosas
+-- 3. Tabela de Pedidos (Recebidos do Checkout)
 create table if not exists public.orders (
   id text primary key,
   customer_name text not null,
-  customer_phone text not null,
+  phone text not null,
   delivery_method text not null,
   address text,
   cep text,
   payment_method text not null,
-  status text default 'Pendente',
+  status text not null default 'Pendente',
   total numeric(10,2) not null,
-  items jsonb not null,
+  items jsonb not null default '[]'::jsonb,
   created_at timestamptz default now()
 );
 
--- 4. Liberar Políticas de Acesso (Row Level Security)
+-- 4. Habilitar RLS e liberar acesso para a chave Publishable (Loja + Painel)
 alter table public.categories enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
@@ -462,197 +622,340 @@ drop policy if exists "Liberar produtos geral" on public.products;
 create policy "Liberar produtos geral" on public.products for all using (true) with check (true);
 
 drop policy if exists "Liberar pedidos geral" on public.orders;
-create policy "Liberar pedidos geral" on public.orders for all using (true) with check (true);`;
+create policy "Liberar pedidos geral" on public.orders for all using (true) with check (true);
+
+-- 5. Criar Bucket Público de Fotos (Supabase Storage)
+insert into storage.buckets (id, name, public)
+values ('products', 'products', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Acesso publico fotos Mimo Rosas" on storage.objects;
+create policy "Acesso publico fotos Mimo Rosas"
+on storage.objects for all
+using (bucket_id = 'products')
+with check (bucket_id = 'products');`;
+
+const SUPABASE_STORAGE_SQL_ONLY = `-- Ativar Galeria de Fotos (Bucket 'products') no Supabase Storage
+insert into storage.buckets (id, name, public)
+values ('products', 'products', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Acesso publico fotos Mimo Rosas" on storage.objects;
+create policy "Acesso publico fotos Mimo Rosas"
+on storage.objects for all
+using (bucket_id = 'products')
+with check (bucket_id = 'products');`;
 
 // ============================================================================
 // COMPONENTES SVG FIÉIS À IMAGEM DE REFERÊNCIA DA MIMO ROSAS
 // ============================================================================
-function RoseLogoSVG({ className = 'w-10 h-11', strokeColor = '#A90F4D' }) {
-  return (
-    <svg viewBox="0 0 80 90" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-      {/* Pétalas superiores em espiral delicada */}
-      <path
-        d="M22 25C22 15 32 10 42 10C52 10 62 15 62 24C62 31 53 35 42 35C31 35 24 30 26 23C28 17 36 15 43 16C49 17 53 20 51 24C49 27 42 28 37 26C34 25 34 21 38 20C41 19 45 20 45 22"
-        stroke={strokeColor}
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Cálice / corpo da rosa */}
-      <path
-        d="M21 24C19 37 23 52 38 59C43 61 48 60 53 56C63 48 65 34 62 23"
-        stroke={strokeColor}
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Dobras internas das pétalas */}
-      <path
-        d="M23 33C31 39 42 40 53 33"
-        stroke={strokeColor}
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-      <path
-        d="M28 45C36 49 48 47 58 37"
-        stroke={strokeColor}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      {/* Caule e folhas inferiores */}
-      <path
-        d="M41 60V83"
-        stroke={strokeColor}
-        strokeWidth="1.9"
-        strokeLinecap="round"
-      />
-      <path
-        d="M41 72C33 67 24 67 19 71C25 75 34 75 41 72Z"
-        stroke={strokeColor}
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M41 74C49 69 57 69 62 73C56 77 48 77 41 74Z"
-        stroke={strokeColor}
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+const MimoRoseOutlineSVG = ({ className = 'w-11 h-12', strokeColor = '#A90F4D' }) => (
+  <svg
+    viewBox="0 0 80 96"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-label="Símbolo Rosa Mimo Rosas"
+  >
+    <path
+      d="M24 18C24 11 32 8 41 8C50 8 59 11 59 18C59 24 49 27 40 27C30 27 24 23 24 18Z"
+      stroke={strokeColor}
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M31 17C34 14 46 14 49 17C51 19 46 22 40 22C34 22 29 19 31 17Z"
+      stroke={strokeColor}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M36 17.5C38 16.5 42 16.5 44 17.5"
+      stroke={strokeColor}
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M23 16C18 19 16 27 18 36C20 46 28 56 41 56C53 56 61 46 63 35C65 26 62 19 58 16"
+      stroke={strokeColor}
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M21 24C27 31 38 34 52 29"
+      stroke={strokeColor}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M18 33C26 42 40 44 58 31"
+      stroke={strokeColor}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M25 46C33 49 48 48 56 41"
+      stroke={strokeColor}
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M40.5 56V89"
+      stroke={strokeColor}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    <path
+      d="M40.5 76C32 71 23 67 16 69C22 75 31 78 40.5 77Z"
+      stroke={strokeColor}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M40.5 78C48 74 56 71 63 73C57 79 49 80 40.5 79Z"
+      stroke={strokeColor}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
-function CategoryIllustration({ type }) {
+const HeartFlourishSVG = ({ className = 'w-64 h-8' }) => (
+  <svg viewBox="0 0 260 36" fill="none" className={className}>
+    <path
+      d="M8 29C55 18 96 22 130 26C164 22 205 14 252 6"
+      stroke="#A90F4D"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M130 25C126 19 120 12 124 8C127 5 130 9 130 13C130 9 134 5 137 8C141 12 135 19 130 25Z"
+      stroke="#A90F4D"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const CategoryIconSVG = ({ type }) => {
   const stroke = '#A90F4D';
   switch (type) {
     case 'cuia':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <path d="M15 21H33C34 29 30 37 24 38C18 37 14 29 15 21Z" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M18 38H30" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
-          <path d="M14 21C18 19 30 19 34 21" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
-          <path d="M27 20L33 10C34 8.5 36 9 35.5 11L30 20" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M29 9L34 5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path d="M25 18L31 7" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path d="M15 18H33" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M14 20C12 25 13 33 19 36C22 37.5 26 37.5 29 36C35 33 36 25 34 20H14Z"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path d="M18 40H30" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path d="M20 36.5L19 40M28 36.5L29 40" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
-    case 'leaf':
+    case 'leaves':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <path d="M24 36C24 25 31 15 39 14C39 24 33 33 24 36Z" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M24 36C24 26 17 17 9 16C9 25 15 33 24 36Z" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M24 38V24" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
+          <path
+            d="M24 36C24 25 18 16 9 14C9 24 14 33 24 36Z"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M24 36C24 24 30 15 39 13C39 23 34 33 24 36Z"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M24 39V22" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M15 21L24 31" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M33 20L24 30" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       );
-    case 'bean':
+    case 'coffee-bean':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <ellipse cx="21" cy="25" rx="9" ry="12" transform="rotate(-18 21 25)" stroke={stroke} strokeWidth="2.1" />
-          <path d="M18 14C22 20 19 29 23 36" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
-          <path d="M28 15C34 16 38 22 36 29C35 34 30 37 26 36" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <ellipse
+            cx="21"
+            cy="24"
+            rx="9"
+            ry="12"
+            transform="rotate(-18 21 24)"
+            stroke={stroke}
+            strokeWidth="2"
+          />
+          <path
+            d="M18 13C22 19 19 28 23 35"
+            stroke={stroke}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          <path
+            d="M28 14C33 15 37 20 36 27C35 33 31 36 26 35"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
       );
-    case 'teacup':
+    case 'tea-cup':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <path d="M12 22H32V27C32 32.5 27.5 36 22 36C16.5 36 12 32.5 12 27V22Z" stroke={stroke} strokeWidth="2.1" strokeLinejoin="round" />
-          <path d="M32 24H35.5C37.5 24 39 25.5 39 27.5C39 29.5 37.5 31 35.5 31H31.5" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
-          <path d="M10 39H34" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
-          <path d="M19 17C19 15 21 14 21 12" stroke={stroke} strokeWidth="1.9" strokeLinecap="round" />
-          <path d="M25 17C25 15 27 14 27 12" stroke={stroke} strokeWidth="1.9" strokeLinecap="round" />
+          <path d="M20 12C20 10 22 9 22 7" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M26 12C26 10 28 9 28 7" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path
+            d="M12 18H32V24C32 30 27.5 34 22 34C16.5 34 12 30 12 24V18Z"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M32 20H35.5C37.5 20 39 21.5 39 23.5C39 25.5 37.5 27 35.5 27H31.5"
+            stroke={stroke}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path d="M10 37H35" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
     case 'gift':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <rect x="11" y="21" width="26" height="17" rx="2.5" stroke={stroke} strokeWidth="2.1" />
-          <rect x="9" y="16" width="30" height="5" rx="1.8" stroke={stroke} strokeWidth="2.1" />
-          <path d="M24 16V38" stroke={stroke} strokeWidth="2.1" />
-          <path d="M24 16C20 16 17 13.5 18 11C19 8.8 22.5 11 24 16Z" stroke={stroke} strokeWidth="2" />
-          <path d="M24 16C28 16 31 13.5 30 11C29 8.8 25.5 11 24 16Z" stroke={stroke} strokeWidth="2" />
+          <rect x="11" y="18" width="26" height="7" rx="1.5" stroke={stroke} strokeWidth="2" />
+          <path
+            d="M13 25V37C13 38.1 13.9 39 15 39H33C34.1 39 35 38.1 35 37V25"
+            stroke={stroke}
+            strokeWidth="2"
+          />
+          <path d="M24 18V39" stroke={stroke} strokeWidth="2" />
+          <path
+            d="M24 18C20 18 16 15.5 16 12.5C16 10.5 18 9 20 9C22.5 9 24 12 24 18Z"
+            stroke={stroke}
+            strokeWidth="2"
+          />
+          <path
+            d="M24 18C28 18 32 15.5 32 12.5C32 10.5 30 9 28 9C25.5 9 24 12 24 18Z"
+            stroke={stroke}
+            strokeWidth="2"
+          />
         </svg>
       );
-    case 'sparkles':
+    case 'cuia-resin':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <path d="M24 11L26.8 20.2L36 23L26.8 25.8L24 35L21.2 25.8L12 23L21.2 20.2L24 11Z" stroke={stroke} strokeWidth="2.1" strokeLinejoin="round" />
-          <path d="M35 11V16M32.5 13.5H37.5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M14 16H34L32 30C31 34 27.5 37 24 37C20.5 37 17 34 16 30L14 16Z"
+            stroke={stroke}
+            strokeWidth="2"
+          />
+          <path d="M15 24C20 27 27 22 33 25" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M19 40H29" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path d="M35 10L36 13L39 14L36 15L35 18L34 15L31 14L34 13L35 10Z" fill={stroke} />
         </svg>
       );
     case 'keychain':
       return (
         <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <circle cx="24" cy="15" r="5" stroke={stroke} strokeWidth="2.1" />
-          <path d="M24 20V24" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" />
-          <path d="M24 38C18 33 14 29 14 25.5C14 23 16 21 18.5 21C20.5 21 22.5 22.2 24 24C25.5 22.2 27.5 21 29.5 21C32 21 34 23 34 25.5C34 29 30 33 24 38Z" stroke={stroke} strokeWidth="2.1" strokeLinejoin="round" />
+          <circle cx="24" cy="13" r="5" stroke={stroke} strokeWidth="2" />
+          <path d="M24 18V23" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M24 39C18 34 14 29.5 14 25.5C14 22.5 16.5 20.5 19 20.5C21 20.5 23 22 24 23.5C25 22 27 20.5 29 20.5C31.5 20.5 34 22.5 34 25.5C34 29.5 30 34 24 39Z"
+            stroke={stroke}
+            strokeWidth="2"
+          />
+        </svg>
+      );
+    case 'bomba':
+      return (
+        <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
+          <path d="M31 9L19 31" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M31 9L35 7" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" />
+          <circle cx="25" cy="20" r="3" fill="#F6E9E5" stroke={stroke} strokeWidth="1.8" />
+          <ellipse
+            cx="17"
+            cy="35"
+            rx="5"
+            ry="6"
+            transform="rotate(25 17 35)"
+            stroke={stroke}
+            strokeWidth="2"
+          />
         </svg>
       );
     default:
-      return (
-        <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-          <path d="M18 36L31 12" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" />
-          <circle cx="25" cy="23" r="3.5" stroke={stroke} strokeWidth="2" />
-          <ellipse cx="16.5" cy="37.5" rx="3.5" ry="2.2" transform="rotate(-28 16.5 37.5)" stroke={stroke} strokeWidth="2" />
-        </svg>
-      );
+      return null;
   }
-}
+};
 
-function WhatsAppIcon({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.05 20.16C10.57 20.16 9.11 19.76 7.85 19L7.55 18.82L4.43 19.64L5.26 16.6L5.06 16.29C4.24 14.98 3.8 13.47 3.8 11.91C3.8 7.37 7.5 3.67 12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.16 12.05 20.16ZM16.56 14C16.31 13.87 15.09 13.27 14.87 13.19C14.64 13.11 14.48 13.07 14.31 13.31C14.15 13.56 13.67 14.12 13.53 14.28C13.38 14.45 13.24 14.47 12.99 14.34C12.74 14.22 11.94 13.95 11 13.11C10.26 12.45 9.77 11.64 9.62 11.39C9.48 11.14 9.6 11.01 9.73 10.89C9.84 10.78 9.98 10.6 10.1 10.46C10.22 10.31 10.27 10.21 10.35 10.04C10.43 9.88 10.39 9.73 10.33 9.61C10.27 9.48 9.77 8.26 9.57 7.77C9.37 7.29 9.16 7.35 9.01 7.34H8.53C8.36 7.34 8.1 7.4 7.87 7.65C7.65 7.9 7.01 8.5 7.01 9.72C7.01 10.94 7.9 12.11 8.02 12.28C8.15 12.44 9.77 14.94 12.25 16.01C12.84 16.27 13.3 16.42 13.66 16.54C14.25 16.73 14.79 16.7 15.22 16.64C15.7 16.57 16.68 16.04 16.89 15.46C17.1 14.88 17.1 14.39 17.03 14.28C16.97 14.18 16.81 14.12 16.56 14Z" />
-    </svg>
-  );
-}
+const formatBRL = (value) =>
+  Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // ============================================================================
-// COMPONENTE PRINCIPAL: LOJA VIRTUAL + PAINEL ADMIN + CONECTOR SUPABASE
+// COMPONENTE PRINCIPAL (VITRINE + PAINEL ADMIN + SUPABASE INTEGRADO)
 // ============================================================================
 export default function App() {
-  // Modo de visualização: 'store' (Vitrine) ou 'admin' (Painel Administrativo)
-  const [viewMode, setViewMode] = useState('store');
+  // Modo de visualização: 'store' (Vitrine Cliente) | 'admin' (Sistema Administrativo)
+  const [appMode, setAppMode] = useState('store');
   const [adminTab, setAdminTab] = useState('products');
 
-  // Autenticação do Painel Admin para quando publicado na Vercel
-  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
-  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
-  const [adminPassword, setAdminPassword] = useState(() => {
+  // Proteção por Senha do Painel Admin (para publicação segura na Vercel)
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     try {
-      return localStorage.getItem('mimo_rosas_admin_pwd') || 'mimo2026';
+      return localStorage.getItem('mimo_admin_unlocked') === 'true';
     } catch {
-      return 'mimo2026';
+      return false;
     }
   });
-  const [adminPassInput, setAdminPassInput] = useState('');
-  const [adminPassError, setAdminPassError] = useState('');
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminPinError, setAdminPinError] = useState('');
 
-  // Credenciais do Supabase
+  // Estados de Conexão Direta com o Supabase
   const [supabaseUrl, setSupabaseUrl] = useState(() => {
     try {
-      return localStorage.getItem('mimo_rosas_sb_url') || DEFAULT_SUPABASE_URL;
+      return localStorage.getItem('mimo_sb_url') || DEFAULT_SUPABASE_URL;
     } catch {
       return DEFAULT_SUPABASE_URL;
     }
   });
+
   const [supabaseKey, setSupabaseKey] = useState(() => {
     try {
-      return localStorage.getItem('mimo_rosas_sb_key') || DEFAULT_SUPABASE_KEY;
+      return localStorage.getItem('mimo_sb_key') || DEFAULT_SUPABASE_ANON_KEY;
     } catch {
-      return DEFAULT_SUPABASE_KEY;
+      return DEFAULT_SUPABASE_ANON_KEY;
     }
   });
+
   const [sbStatus, setSbStatus] = useState({
     connected: false,
     loading: false,
-    message: 'Pronto para sincronizar com o Supabase.'
+    message: 'Verificando conexão com o Supabase...'
   });
 
-  // Estados principais de Catálogo, Pedidos e Configurações
-  const [categories] = useState(INITIAL_CATEGORIES);
+  // Banco de Dados Reativo (Sincroniza entre Vitrine, Painel Admin e Supabase)
+  const [categories, setCategories] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mimo_db_categories');
+      return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+    } catch {
+      return INITIAL_CATEGORIES;
+    }
+  });
+
   const [products, setProducts] = useState(() => {
     try {
-      const saved = localStorage.getItem('mimo_rosas_products');
+      const saved = localStorage.getItem('mimo_db_products');
       return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
     } catch {
       return INITIAL_PRODUCTS;
@@ -661,7 +964,7 @@ export default function App() {
 
   const [orders, setOrders] = useState(() => {
     try {
-      const saved = localStorage.getItem('mimo_rosas_orders');
+      const saved = localStorage.getItem('mimo_db_orders');
       return saved ? JSON.parse(saved) : INITIAL_ORDERS;
     } catch {
       return INITIAL_ORDERS;
@@ -670,43 +973,70 @@ export default function App() {
 
   const [storeConfig, setStoreConfig] = useState(() => {
     try {
-      const saved = localStorage.getItem('mimo_rosas_config');
+      const saved = localStorage.getItem('mimo_db_config');
       return saved
         ? JSON.parse(saved)
         : {
             whatsappNumber: '5554999999999',
-            freeShippingThreshold: 120,
-            shippingFlatRate: 14.9,
+            freeShippingMin: 120,
+            defaultShippingFee: 14.9,
             assistantGreeting:
-              'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.'
+              'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
+            adminPassword: 'mimo2026'
           };
     } catch {
       return {
         whatsappNumber: '5554999999999',
-        freeShippingThreshold: 120,
-        shippingFlatRate: 14.9,
+        freeShippingMin: 120,
+        defaultShippingFee: 14.9,
         assistantGreeting:
-          'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.'
+          'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
+        adminPassword: 'mimo2026'
       };
     }
   });
 
-  // Estados de navegação da Loja
-  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'categories' | 'favorites' | 'account'
+  // Estados da Vitrine
+  const [activeView, setActiveView] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sideMenuOpen, setSideMenuOpen] = useState(false);
-  const [aboutModalOpen, setAboutModalOpen] = useState(false);
-  const [heroSlide, setHeroSlide] = useState(0);
-
-  // Produto individual aberto
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedVariation, setSelectedVariation] = useState('');
   const [productQty, setProductQty] = useState(1);
+  const [selectedVariation, setSelectedVariation] = useState('');
   const [activeGalleryIdx, setActiveGalleryIdx] = useState(0);
 
-  // Favoritos e Carrinho
+  // Menus e Modais da Loja
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('featured');
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [addedFeedbackId, setAddedFeedbackId] = useState(null);
+  const [cartBounce, setCartBounce] = useState(false);
+
+  // Estados do Painel Admin (Criação/Edição de Produto)
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadStatusMsg, setUploadStatusMsg] = useState('');
+  const [adminToast, setAdminToast] = useState('');
+  const [storeToast, setStoreToast] = useState('');
+  const [selectedFilePreview, setSelectedFilePreview] = useState({
+    title: 'Arquivo 1: package.json',
+    code: GITHUB_FILES.packageJson
+  });
+
+  // Carrinho e Favoritos
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mimo_rosas_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [favorites, setFavorites] = useState(() => {
     try {
       const saved = localStorage.getItem('mimo_rosas_favs');
@@ -716,105 +1046,98 @@ export default function App() {
     }
   });
 
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mimo_rosas_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [cartOpen, setCartOpen] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [checkoutSuccess, setCheckoutSuccess] = useState(null);
-
-  // Formulário de Checkout Demonstrativo
-  const [checkoutForm, setCheckoutForm] = useState({
+  // Checkout Demonstrativo
+  const [checkoutData, setCheckoutData] = useState({
     name: '',
     phone: '',
-    deliveryMethod: 'delivery', // 'delivery' | 'pickup'
     cep: '',
     address: '',
-    paymentMethod: 'pix' // 'pix' | 'card'
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    deliveryMethod: 'delivery',
+    paymentMethod: 'pix',
+    cardNumber: '',
+    cardHolder: '',
+    cardExpiry: '',
+    cardCvv: ''
   });
-  const [checkoutError, setCheckoutError] = useState('');
+  const [orderSuccess, setOrderSuccess] = useState(null);
 
-  // Assistente Virtual Mimo Rosas
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
+  // Assistente Virtual
   const [chatMessages, setChatMessages] = useState([
     {
       id: 'welcome',
       sender: 'bot',
-      text: 'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
-      recommendedProductId: null
+      text: storeConfig.assistantGreeting,
+      time: 'Agora'
     }
   ]);
-
-  // Estados do Painel Admin (Criação/Edição de Produto)
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [adminToast, setAdminToast] = useState('');
-  const [storeToast, setStoreToast] = useState('');
-  const [selectedFilePreview, setSelectedFilePreview] = useState({
-    filename: 'package.json',
-    content: JSON.stringify(
-      {
-        name: 'mimo-rosas-loja',
-        private: true,
-        version: '1.0.0',
-        type: 'module',
-        scripts: {
-          dev: 'vite',
-          build: 'vite build',
-          preview: 'vite preview'
-        },
-        dependencies: {
-          react: '^18.3.1',
-          'react-dom': '^18.3.1',
-          'lucide-react': '^0.460.0'
-        },
-        devDependencies: {
-          '@vitejs/plugin-react': '^4.3.1',
-          vite: '^5.4.1'
-        }
-      },
-      null,
-      2
-    )
-  });
+  const [chatInput, setChatInput] = useState('');
+  const [isBotTyping, setIsBotTyping] = useState(false);
 
   const categoryScrollRef = useRef(null);
   const catalogSectionRef = useRef(null);
   const chatEndRef = useRef(null);
   const codePreviewTextareaRef = useRef(null);
+  const mainImageInputRef = useRef(null);
+  const galleryImageInputRef = useRef(null);
 
   // Função segura de cópia que funciona dentro do Preview sem erro NotAllowedError
-  const safeCopyText = (text, label = 'Conteúdo') => {
+  const safeCopyText = (textToCopy, label = 'Conteúdo') => {
+    let copied = false;
     try {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-9999px';
-      textArea.style.top = '0';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      const copied = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      if (copied) {
-        showAdminToast(`${label} copiado para a área de transferência!`);
-        return;
-      }
+      const textarea = document.createElement('textarea');
+      textarea.value = textToCopy;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
     } catch {
-      // Continua para fallback visual
+      copied = false;
     }
-    showAdminToast(`${label} exibido abaixo! Pressione Ctrl+C para copiar.`);
+
+    if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(textToCopy)
+        .then(() => showAdminToast(`${label} copiado!`))
+        .catch(() => showAdminToast(`${label} exibido abaixo para selecionar e copiar.`));
+      return;
+    }
+
+    showAdminToast(`${label} copiado para a área de transferência!`);
   };
 
-  // Salvar alterações no localStorage
+  // Permite abrir direto no painel com ?admin=1 no link da Vercel
   useEffect(() => {
     try {
-      localStorage.setItem('mimo_rosas_products', JSON.stringify(products));
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin') === '1') {
+        setAppMode('admin');
+      }
+    } catch {
+      // ignora
+    }
+  }, []);
+
+  // Persistência Local
+  useEffect(() => {
+    try {
+      localStorage.setItem('mimo_db_categories', JSON.stringify(categories));
+    } catch {
+      // ignore
+    }
+  }, [categories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mimo_db_products', JSON.stringify(products));
     } catch {
       // ignore
     }
@@ -822,11 +1145,19 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mimo_rosas_orders', JSON.stringify(orders));
+      localStorage.setItem('mimo_db_orders', JSON.stringify(orders));
     } catch {
       // ignore
     }
   }, [orders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mimo_db_config', JSON.stringify(storeConfig));
+    } catch {
+      // ignore
+    }
+  }, [storeConfig]);
 
   useEffect(() => {
     try {
@@ -846,41 +1177,12 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mimo_rosas_config', JSON.stringify(storeConfig));
+      localStorage.setItem('mimo_sb_url', supabaseUrl);
+      localStorage.setItem('mimo_sb_key', supabaseKey);
     } catch {
       // ignore
     }
-  }, [storeConfig]);
-
-  // Suporte a ?admin=1 na URL
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('admin') === '1') {
-        setShowAdminLoginModal(true);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // Sincronização inicial automática com o Supabase se configurado
-  useEffect(() => {
-    if (supabaseUrl && supabaseKey) {
-      fetchFromSupabaseSilent();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (assistantOpen && chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, assistantOpen]);
-
-  const showStoreNotification = (msg) => {
-    setStoreToast(msg);
-    setTimeout(() => setStoreToast(''), 2600);
-  };
+  }, [supabaseUrl, supabaseKey]);
 
   const showAdminToast = (msg) => {
     setAdminToast(msg);
@@ -888,192 +1190,312 @@ export default function App() {
   };
 
   // ============================================================================
-  // FUNÇÕES REST DO SUPABASE (SEM DEPENDÊNCIAS EXTERNAS)
+  // UPLOAD DE FOTOS: SUPABASE STORAGE + COMPRESSÃO INTELIGENTE AUTOMÁTICA
   // ============================================================================
-  const getSupabaseHeaders = () => ({
-    apikey: supabaseKey.trim(),
-    Authorization: `Bearer ${supabaseKey.trim()}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=representation,resolution=merge-duplicates'
-  });
+  const compressImageToDataUrl = (file, maxWidth = 900, quality = 0.82) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-  const fetchFromSupabaseSilent = async () => {
-    if (!supabaseUrl || !supabaseKey) return;
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = (err) => reject(err);
+        img.src = event.target.result;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const uploadProductPhoto = async (file, target = 'main') => {
+    if (!file || !editingProduct) return;
+    setUploadingImage(true);
+    setUploadStatusMsg('Enviando e otimizando foto...');
+
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-      const prodRes = await fetch(`${cleanUrl}/rest/v1/products?select=*&order=created_at.asc`, {
-        headers: getSupabaseHeaders()
-      });
-      if (prodRes.ok) {
-        const dbProds = await prodRes.json();
-        if (Array.isArray(dbProds) && dbProds.length > 0) {
-          const mapped = dbProds.map((p) => ({
-            id: p.id,
-            name: p.name,
-            category: p.category,
-            price: Number(p.price),
-            stock: Number(p.stock ?? 10),
-            badge: p.badge || '',
-            badgeType: p.badge_type || 'star',
-            featured: Boolean(p.featured),
-            active: p.active !== false,
-            image: p.image,
-            gallery: [p.image],
-            variations: Array.isArray(p.variations) ? p.variations : ['Padrão'],
-            description: p.description || ''
-          }));
-          setProducts(mapped);
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const safeFileName = `mimo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext || 'jpg'}`;
+
+      let finalImageUrl = '';
+      let usedStorageBucket = false;
+
+      // 1. Tenta enviar diretamente para o Supabase Storage (bucket 'products')
+      if (cleanUrl && supabaseKey) {
+        try {
+          const uploadRes = await fetch(
+            `${cleanUrl}/storage/v1/object/products/${safeFileName}`,
+            {
+              method: 'POST',
+              headers: {
+                apikey: supabaseKey.trim(),
+                Authorization: `Bearer ${supabaseKey.trim()}`,
+                'Content-Type': file.type || 'image/jpeg',
+                'x-upsert': 'true'
+              },
+              body: file
+            }
+          );
+
+          if (uploadRes.ok) {
+            finalImageUrl = `${cleanUrl}/storage/v1/object/public/products/${safeFileName}`;
+            usedStorageBucket = true;
+          }
+        } catch {
+          // Segue para o fallback automático comprimido
         }
-        setSbStatus({
-          connected: true,
-          loading: false,
-          message: `Conectado ao Supabase (${dbProds.length} produtos sincronizados).`
-        });
       }
 
-      const ordRes = await fetch(`${cleanUrl}/rest/v1/orders?select=*&order=created_at.desc`, {
-        headers: getSupabaseHeaders()
-      });
-      if (ordRes.ok) {
-        const dbOrders = await ordRes.json();
-        if (Array.isArray(dbOrders) && dbOrders.length > 0) {
-          const mappedOrders = dbOrders.map((o) => ({
-            id: o.id,
-            customerName: o.customer_name,
-            customerPhone: o.customer_phone,
-            deliveryMethod: o.delivery_method,
-            address: o.address || '',
-            cep: o.cep || '',
-            paymentMethod: o.payment_method,
-            status: o.status || 'Pendente',
-            total: Number(o.total),
-            createdAt: o.created_at
-              ? new Date(o.created_at).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
-              : 'Recente',
-            items: Array.isArray(o.items) ? o.items : []
-          }));
-          setOrders(mappedOrders);
-        }
+      // 2. Fallback Inteligente: Comprime em HTML5 Canvas (máx 900px, JPEG 82%) se o bucket ainda não foi criado
+      if (!finalImageUrl) {
+        finalImageUrl = await compressImageToDataUrl(file, 900, 0.82);
       }
-    } catch {
-      // fallback local
+
+      setEditingProduct((prev) => {
+        if (!prev) return prev;
+        const currentGallery =
+          Array.isArray(prev.gallery) && prev.gallery.length > 0
+            ? prev.gallery
+            : prev.image
+            ? [prev.image]
+            : [];
+
+        if (target === 'main') {
+          const updatedGallery = [
+            finalImageUrl,
+            ...currentGallery.filter((url) => url !== finalImageUrl)
+          ];
+          return {
+            ...prev,
+            image: finalImageUrl,
+            gallery: updatedGallery
+          };
+        } else {
+          const updatedGallery = [...currentGallery, finalImageUrl];
+          return {
+            ...prev,
+            image: prev.image || finalImageUrl,
+            gallery: updatedGallery
+          };
+        }
+      });
+
+      if (usedStorageBucket) {
+        setUploadStatusMsg('✅ Foto salva no Supabase Storage (Bucket products)!');
+        showAdminToast('Foto enviada para o Supabase Storage!');
+      } else {
+        setUploadStatusMsg(
+          '✅ Foto otimizada e pronta! (Para usar links públicos do Storage, ative o SQL de Fotos na aba Supabase).'
+        );
+        showAdminToast('Foto carregada e otimizada com sucesso!');
+      }
+    } catch (err) {
+      setUploadStatusMsg(`Erro ao processar imagem: ${err.message}`);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
-  const testSupabaseConnection = async () => {
-    setSbStatus({ connected: false, loading: true, message: 'Testando conexão com o Supabase...' });
-    try {
-      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-      const prodRes = await fetch(`${cleanUrl}/rest/v1/products?select=id`, {
-        headers: getSupabaseHeaders()
+  // ============================================================================
+  // FUNÇÕES REST DO SUPABASE (SEM DEPENDÊNCIAS EXTERNAS)
+  // ============================================================================
+  const sbHeaders = (prefer = 'return=representation') => ({
+    apikey: supabaseKey.trim(),
+    Authorization: `Bearer ${supabaseKey.trim()}`,
+    'Content-Type': 'application/json',
+    Prefer: prefer
+  });
+
+  const fetchFromSupabase = async (silent = false) => {
+    const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+    const cleanKey = supabaseKey.trim();
+    if (!cleanUrl || !cleanKey) {
+      setSbStatus({
+        connected: false,
+        loading: false,
+        message: 'Cole sua Publishable Key do Supabase para conectar.'
       });
-      const ordRes = await fetch(`${cleanUrl}/rest/v1/orders?select=id`, {
-        headers: getSupabaseHeaders()
+      return;
+    }
+
+    if (!silent) {
+      setSbStatus({ connected: false, loading: true, message: 'Testando conexão com o Supabase...' });
+    }
+
+    try {
+      const prodRes = await fetch(`${cleanUrl}/rest/v1/products?select=*&order=created_at.asc`, {
+        headers: sbHeaders()
       });
 
       if (!prodRes.ok) {
         const errText = await prodRes.text();
-        setSbStatus({
-          connected: false,
-          loading: false,
-          message: `Erro Supabase (${prodRes.status}): ${errText}`
-        });
-        return;
+        throw new Error(
+          prodRes.status === 404 || errText.includes('relation')
+            ? 'Tabelas ainda não encontradas. Rode o SQL no SQL Editor do Supabase.'
+            : `Erro (${prodRes.status}): verifique se já executou o SQL no Supabase.`
+        );
       }
 
-      const prods = await prodRes.json();
-      const ords = ordRes.ok ? await ordRes.json() : [];
+      const dbProducts = await prodRes.json();
+
+      const ordRes = await fetch(`${cleanUrl}/rest/v1/orders?select=*&order=created_at.desc`, {
+        headers: sbHeaders()
+      });
+      const dbOrders = ordRes.ok ? await ordRes.json() : [];
+
+      if (Array.isArray(dbProducts) && dbProducts.length > 0) {
+        const mappedProducts = dbProducts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category || 'infusoes',
+          price: Number(p.price),
+          stock: Number(p.stock),
+          badge: p.badge,
+          badgeType: p.badge_type || 'star',
+          featured: Boolean(p.featured),
+          active: p.active !== false,
+          rating: Number(p.rating || 5),
+          reviews: Number(p.reviews || 12),
+          image: p.image,
+          gallery: Array.isArray(p.gallery) && p.gallery.length ? p.gallery : [p.image],
+          variations: Array.isArray(p.variations) && p.variations.length ? p.variations : ['Padrão'],
+          description: p.description || ''
+        }));
+        setProducts(mappedProducts);
+      }
+
+      if (Array.isArray(dbOrders) && dbOrders.length > 0) {
+        const mappedOrders = dbOrders.map((o) => ({
+          id: o.id,
+          customerName: o.customer_name,
+          phone: o.phone,
+          deliveryMethod: o.delivery_method,
+          address: o.address,
+          cep: o.cep,
+          paymentMethod: o.payment_method,
+          status: o.status,
+          total: Number(o.total),
+          createdAt: new Date(o.created_at).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          items: Array.isArray(o.items) ? o.items : []
+        }));
+        setOrders(mappedOrders);
+      }
+
       setSbStatus({
         connected: true,
         loading: false,
-        message: `Conectado com sucesso! (${prods.length} produtos e ${ords.length} pedidos encontrados no banco).`
+        message: `Conectado com sucesso! (${dbProducts.length} produtos e ${dbOrders.length} pedidos encontrados no banco).`
       });
-      fetchFromSupabaseSilent();
+      if (!silent) showAdminToast('Conectado ao Supabase com sucesso!');
     } catch (err) {
       setSbStatus({
         connected: false,
         loading: false,
-        message: `Falha na conexão: ${err.message}`
+        message: err.message || 'Não foi possível conectar ao Supabase.'
       });
     }
   };
 
+  // Envia todos os 8 grupos de categorias e 16 produtos iniciais para o Supabase com 1 clique
   const seedInitialDataToSupabase = async () => {
-    setSbStatus({ connected: false, loading: true, message: 'Enviando 8 categorias e 16 produtos para o Supabase...' });
-    try {
-      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+    const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+    const cleanKey = supabaseKey.trim();
+    if (!cleanUrl || !cleanKey) {
+      showAdminToast('Preencha a URL e a Publishable Key primeiro!');
+      return;
+    }
 
-      // 1. Enviar categorias
+    setSbStatus({
+      connected: false,
+      loading: true,
+      message: 'Enviando 8 categorias e 16 produtos para o seu Supabase...'
+    });
+
+    try {
       const catPayload = categories.map((c) => ({
         id: c.id,
         name: c.name,
         short_name: c.shortName,
-        icon: c.icon
+        icon_type: c.iconType,
+        description: c.description
       }));
+
       const catRes = await fetch(`${cleanUrl}/rest/v1/categories`, {
         method: 'POST',
-        headers: getSupabaseHeaders(),
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
         body: JSON.stringify(catPayload)
       });
 
       if (!catRes.ok) {
-        const errText = await catRes.text();
-        setSbStatus({
-          connected: false,
-          loading: false,
-          message: `Erro ao enviar categorias (${catRes.status}): ${errText}`
-        });
-        return;
+        const errBody = await catRes.text();
+        throw new Error(`Erro Supabase (${catRes.status}): ${errBody}`);
       }
 
-      // 2. Enviar produtos
       const prodPayload = products.map((p) => ({
         id: p.id,
         name: p.name,
         category: p.category,
         price: Number(p.price),
         stock: Number(p.stock),
-        badge: p.badge || '',
+        badge: p.badge || null,
         badge_type: p.badgeType || 'star',
         featured: Boolean(p.featured),
         active: p.active !== false,
+        rating: Number(p.rating || 5.0),
+        reviews: Number(p.reviews || 15),
         image: p.image,
-        description: p.description || '',
-        variations: p.variations || ['Padrão']
+        gallery: p.gallery || [p.image],
+        variations: p.variations || ['Padrão'],
+        description: p.description || ''
       }));
 
       const prodRes = await fetch(`${cleanUrl}/rest/v1/products`, {
         method: 'POST',
-        headers: getSupabaseHeaders(),
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
         body: JSON.stringify(prodPayload)
       });
 
       if (!prodRes.ok) {
-        const errText = await prodRes.text();
-        setSbStatus({
-          connected: false,
-          loading: false,
-          message: `Erro ao enviar produtos (${prodRes.status}): ${errText}`
-        });
-        return;
+        const errBody = await prodRes.text();
+        throw new Error(`Erro ao gravar produtos: ${errBody}`);
       }
 
       setSbStatus({
         connected: true,
         loading: false,
-        message: 'Sucesso! Todas as 8 categorias e 16 produtos foram gravados no Supabase!'
+        message: 'Sucesso! As 8 categorias e 16 produtos da Mimo Rosas estão gravados no Supabase!'
       });
-      showAdminToast('Banco Supabase sincronizado com sucesso!');
+      showAdminToast('16 Produtos e 8 Categorias enviados ao Supabase!');
     } catch (err) {
       setSbStatus({
         connected: false,
         loading: false,
-        message: `Erro de rede: ${err.message}`
+        message: `Erro ao enviar dados: ${err.message}`
       });
     }
   };
@@ -1084,41 +1506,44 @@ export default function App() {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
       await fetch(`${cleanUrl}/rest/v1/products`, {
         method: 'POST',
-        headers: getSupabaseHeaders(),
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
         body: JSON.stringify({
           id: prod.id,
           name: prod.name,
           category: prod.category,
           price: Number(prod.price),
           stock: Number(prod.stock),
-          badge: prod.badge || '',
+          badge: prod.badge || null,
           badge_type: prod.badgeType || 'star',
           featured: Boolean(prod.featured),
           active: prod.active !== false,
+          rating: Number(prod.rating || 5),
+          reviews: Number(prod.reviews || 10),
           image: prod.image,
-          description: prod.description || '',
-          variations: prod.variations || ['Padrão']
+          gallery: prod.gallery || [prod.image],
+          variations: prod.variations || ['Padrão'],
+          description: prod.description || ''
         })
       });
     } catch {
-      // ignore
+      // fallback local
     }
   };
 
-  const syncOrderToSupabase = async (orderObj) => {
+  const syncNewOrderToSupabase = async (orderObj) => {
     if (!supabaseUrl || !supabaseKey) return;
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
       await fetch(`${cleanUrl}/rest/v1/orders`, {
         method: 'POST',
-        headers: getSupabaseHeaders(),
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
         body: JSON.stringify({
           id: orderObj.id,
           customer_name: orderObj.customerName,
-          customer_phone: orderObj.customerPhone,
+          phone: orderObj.phone,
           delivery_method: orderObj.deliveryMethod,
-          address: orderObj.address || '',
-          cep: orderObj.cep || '',
+          address: orderObj.address,
+          cep: orderObj.cep,
           payment_method: orderObj.paymentMethod,
           status: orderObj.status,
           total: Number(orderObj.total),
@@ -1126,85 +1551,155 @@ export default function App() {
         })
       });
     } catch {
-      // ignore
+      // fallback local
     }
   };
 
-  // ============================================================================
-  // LÓGICA DE NAVEGAÇÃO, PRODUTOS, CARRINHO E CHECKOUT
-  // ============================================================================
-  const activeProducts = useMemo(() => products.filter((p) => p.active !== false), [products]);
+  // Conecta automaticamente ao carregar se a chave já estiver configurada
+  useEffect(() => {
+    if (supabaseUrl && supabaseKey) {
+      fetchFromSupabase(true);
+    }
+  }, []);
+
+  // Rotação do Banner
+  useEffect(() => {
+    if (activeView !== 'home' || appMode !== 'store') return;
+    const interval = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 5500);
+    return () => clearInterval(interval);
+  }, [activeView, appMode]);
+
+  useEffect(() => {
+    if (isAssistantOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isAssistantOpen, isBotTyping]);
+
+  // Cálculos do Carrinho
+  const cartCount = useMemo(
+    () => cart.reduce((acc, item) => acc + item.quantity, 0),
+    [cart]
+  );
+
+  const cartSubtotal = useMemo(
+    () => cart.reduce((acc, item) => acc + item.price * item.quantity, 0),
+    [cart]
+  );
+
+  const shippingFee = useMemo(() => {
+    if (cart.length === 0) return 0;
+    if (checkoutData.deliveryMethod === 'pickup') return 0;
+    if (cartSubtotal >= Number(storeConfig.freeShippingMin || 120)) return 0;
+    return Number(storeConfig.defaultShippingFee || 14.9);
+  }, [cart.length, checkoutData.deliveryMethod, cartSubtotal, storeConfig]);
+
+  const cartTotal = cartSubtotal + shippingFee;
+
+  // Produtos ativos na Vitrine
+  const visibleProducts = useMemo(
+    () => products.filter((p) => p.active !== false),
+    [products]
+  );
 
   const featuredProducts = useMemo(
-    () => activeProducts.filter((p) => p.featured),
-    [activeProducts]
+    () => visibleProducts.filter((p) => p.featured),
+    [visibleProducts]
   );
 
   const filteredProducts = useMemo(() => {
-    return activeProducts.filter((p) => {
-      const matchesCat = selectedCategory === 'all' || p.category === selectedCategory;
-      const matchesQuery =
-        !searchQuery.trim() ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCat && matchesQuery;
-    });
-  }, [activeProducts, selectedCategory, searchQuery]);
+    let list = [...visibleProducts];
+    if (selectedCategory !== 'all') {
+      list = list.filter((p) => p.category === selectedCategory);
+    }
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (sortBy === 'price-asc') {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price-desc') {
+      list.sort((a, b) => b.price - a.price);
+    } else {
+      list.sort((a, b) => Number(b.featured) - Number(a.featured));
+    }
+    return list;
+  }, [visibleProducts, selectedCategory, searchQuery, sortBy]);
 
-  const favoriteProducts = useMemo(
-    () => activeProducts.filter((p) => favorites.includes(p.id)),
-    [activeProducts, favorites]
-  );
+  // Funções da Loja
+  const openProductDetail = (product) => {
+    setSelectedProduct(product);
+    setProductQty(1);
+    setSelectedVariation(product.variations?.[0] || 'Padrão');
+    setActiveGalleryIdx(0);
+    setActiveView('product');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateCategory = (catId) => {
+    setSelectedCategory(catId);
+    setActiveView('catalog');
+    setIsSideMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const toggleFavorite = (productId, e) => {
     if (e) e.stopPropagation();
-    setFavorites((prev) => {
-      const exists = prev.includes(productId);
-      const updated = exists ? prev.filter((id) => id !== productId) : [...prev, productId];
-      showStoreNotification(exists ? 'Removido dos favoritos' : 'Salvo nos seus Favoritos 🌹');
-      return updated;
-    });
-  };
-
-  const openProductModal = (product) => {
-    setSelectedProduct(product);
-    setSelectedVariation(product.variations?.[0] || 'Padrão');
-    setProductQty(1);
-    setActiveGalleryIdx(0);
+    setFavorites((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
   };
 
   const addToCart = (product, qty = 1, variation = null, e = null) => {
     if (e) e.stopPropagation();
     const chosenVar = variation || product.variations?.[0] || 'Padrão';
+    const cartKey = `${product.id}__${chosenVar}`;
+
     setCart((prev) => {
-      const key = `${product.id}__${chosenVar}`;
-      const existingIndex = prev.findIndex((item) => item.cartKey === key);
-      if (existingIndex > -1) {
-        const clone = [...prev];
-        clone[existingIndex].qty += qty;
-        return clone;
+      const existing = prev.find((item) => item.cartKey === cartKey);
+      if (existing) {
+        return prev.map((item) =>
+          item.cartKey === cartKey
+            ? { ...item, quantity: item.quantity + qty }
+            : item
+        );
       }
       return [
         ...prev,
         {
-          cartKey: key,
+          cartKey,
           id: product.id,
           name: product.name,
           price: product.price,
           image: product.image,
           variation: chosenVar,
-          qty
+          quantity: qty
         }
       ];
     });
-    showStoreNotification(`"${product.name}" adicionado ao carrinho!`);
+
+    setAddedFeedbackId(product.id);
+    setCartBounce(true);
+    setTimeout(() => setAddedFeedbackId(null), 1100);
+    setTimeout(() => setCartBounce(false), 600);
   };
 
   const updateCartQty = (cartKey, delta) => {
     setCart((prev) =>
       prev
-        .map((item) => (item.cartKey === cartKey ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
+        .map((item) =>
+          item.cartKey === cartKey
+            ? { ...item, quantity: item.quantity + delta }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
     );
   };
 
@@ -1212,179 +1707,180 @@ export default function App() {
     setCart((prev) => prev.filter((item) => item.cartKey !== cartKey));
   };
 
-  const cartCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart]);
-  const cartSubtotal = useMemo(
-    () => cart.reduce((acc, item) => acc + item.price * item.qty, 0),
-    [cart]
-  );
-  const shippingCost = useMemo(() => {
-    if (cart.length === 0) return 0;
-    if (checkoutForm.deliveryMethod === 'pickup') return 0;
-    if (cartSubtotal >= storeConfig.freeShippingThreshold) return 0;
-    return Number(storeConfig.shippingFlatRate || 14.9);
-  }, [cart.length, checkoutForm.deliveryMethod, cartSubtotal, storeConfig]);
+  const scrollCategoriesRight = () => {
+    if (categoryScrollRef.current) {
+      categoryScrollRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+    }
+  };
 
-  const cartTotal = cartSubtotal + shippingCost;
+  // Assistente Virtual Inteligente
+  const handleAssistantOption = (optionType, customQuestion = null) => {
+    const userLabel =
+      customQuestion ||
+      {
+        produtos: 'Conhecer produtos',
+        precos: 'Consultar preços',
+        presentes: 'Encontrar presentes',
+        duvidas: 'Tirar dúvidas',
+        pedidos: 'Ajuda com pedidos'
+      }[optionType];
 
-  const handleCheckoutSubmit = (e) => {
+    const userMsg = {
+      id: `u-${Date.now()}`,
+      sender: 'user',
+      text: userLabel,
+      time: 'Agora'
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    setIsBotTyping(true);
+
+    setTimeout(() => {
+      let botReply = '';
+      let suggestedProducts = [];
+
+      if (optionType === 'produtos') {
+        botReply =
+          'Trabalhamos com uma linha artesanal completa: Infusões e Blends para Chimarrão, Cápsulas de Chá em formato de Rosa, Cápsulas de Café, Cuias Resinadas, Enfeites, Chaveiros e Bombas Personalizadas! 🌹 Veja nossos queridinhos:';
+        suggestedProducts = visibleProducts.slice(0, 2);
+      } else if (optionType === 'precos') {
+        botReply = `Nossos produtos têm valores super acessíveis: Enfeites a partir de R$ 14,90, Cápsulas de Chá Rosa por R$ 19,90, Infusões por R$ 24,90 e Cuias Resinadas a partir de R$ 119,90. Compras acima de ${formatBRL(
+          storeConfig.freeShippingMin
+        )} ganham Frete Grátis! ✨`;
+        suggestedProducts = [visibleProducts[1], visibleProducts[3]].filter(Boolean);
+      } else if (optionType === 'presentes') {
+        botReply =
+          'Para presentear com emoção, recomendo as nossas Cápsulas de Chá – Rosa e os Chaveiros em Resina com Pétalas Reais. Todos vão embalados com cheirinho Mimo Rosas! 🎁💖';
+        suggestedProducts = visibleProducts
+          .filter((p) => p.category === 'capsulas-cha' || p.category === 'chaveiros')
+          .slice(0, 2);
+      } else if (optionType === 'duvidas') {
+        botReply =
+          'Como usar as Cápsulas de Chá Rosa? 🌹 Basta colocar 1 rosa em 200ml de água quente (85°C) e aguardar 3 minutinhos: ela derrete e libera as pétalas e o aroma natural!';
+      } else if (optionType === 'pedidos') {
+        botReply =
+          cart.length > 0
+            ? `Você já tem ${cartCount} ${
+                cartCount === 1 ? 'item' : 'itens'
+              } na sacola (${formatBRL(
+                cartSubtotal
+              )}). Posso te levar direto para o Checkout agora mesmo!`
+            : 'Para fazer seu pedido é muito simples: escolha seus produtos, clique em "Adicionar ao carrinho" e preencha seus dados de Entrega ou Retirada.';
+      } else {
+        const q = (customQuestion || '').toLowerCase();
+        const found = visibleProducts.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            (p.description || '').toLowerCase().includes(q)
+        );
+        if (found.length > 0) {
+          botReply = `Encontrei ${found.length} ${
+            found.length === 1 ? 'opção especial' : 'opções especiais'
+          } para você na Mimo Rosas! 🌹 Toque no card abaixo para ver os detalhes:`;
+          suggestedProducts = found.slice(0, 2);
+        } else {
+          botReply =
+            'Que carinho receber sua mensagem! 🌹 Todas as nossas peças são produzidas artesanalmente. Escolha uma das opções abaixo ou explore nossas categorias!';
+        }
+      }
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `b-${Date.now()}`,
+          sender: 'bot',
+          text: botReply,
+          products: suggestedProducts,
+          time: 'Agora'
+        }
+      ]);
+      setIsBotTyping(false);
+    }, 600);
+  };
+
+  const handleChatSubmit = (e) => {
     e.preventDefault();
-    if (!checkoutForm.name.trim() || !checkoutForm.phone.trim()) {
-      setCheckoutError('Por favor, preencha seu nome e telefone para continuarmos.');
-      return;
-    }
-    if (
-      checkoutForm.deliveryMethod === 'delivery' &&
-      (!checkoutForm.address.trim() || !checkoutForm.cep.trim())
-    ) {
-      setCheckoutError('Informe o endereço e CEP para entrega, ou selecione Retirada.');
-      return;
-    }
+    if (!chatInput.trim()) return;
+    const text = chatInput.trim();
+    setChatInput('');
+    handleAssistantOption('custom', text);
+  };
 
+  // Finalizar Pedido (Salva no Admin + Sincroniza com o Supabase em Tempo Real)
+  const handleCheckoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!checkoutData.name.trim() || !checkoutData.phone.trim()) return;
+
+    const code = `MR-${Math.floor(10000 + Math.random() * 90000)}`;
     const newOrder = {
-      id: `PED-${Math.floor(1000 + Math.random() * 9000)}`,
-      customerName: checkoutForm.name.trim(),
-      customerPhone: checkoutForm.phone.trim(),
-      deliveryMethod: checkoutForm.deliveryMethod,
-      address: checkoutForm.deliveryMethod === 'delivery' ? checkoutForm.address.trim() : 'Retirada no Ateliê Mimo Rosas',
-      cep: checkoutForm.cep.trim(),
-      paymentMethod: checkoutForm.paymentMethod,
-      status: 'Pendente',
+      id: code,
+      customerName: checkoutData.name,
+      phone: checkoutData.phone,
+      deliveryMethod: checkoutData.deliveryMethod,
+      address:
+        checkoutData.deliveryMethod === 'delivery'
+          ? `${checkoutData.address}, ${checkoutData.number || 'S/N'} - ${
+              checkoutData.city || ''
+            }`
+          : 'Retirada no Ateliê Mimo Rosas',
+      cep: checkoutData.cep || '-',
+      paymentMethod: checkoutData.paymentMethod,
+      status: checkoutData.paymentMethod === 'pix' ? 'Aguardando PIX' : 'Pago',
       total: cartTotal,
-      createdAt: new Date().toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      items: cart.map((i) => ({
-        id: i.id,
-        name: i.name,
-        qty: i.qty,
-        price: i.price,
-        variation: i.variation
+      createdAt: 'Agora mesmo',
+      items: cart.map((item) => ({
+        id: item.id,
+        name: `${item.name} (${item.variation})`,
+        qty: item.quantity,
+        price: item.price
       }))
     };
 
-    // Atualizar estoque dos produtos
+    // 1. Adiciona no Painel Admin local
+    setOrders((prev) => [newOrder, ...prev]);
+
+    // 2. Baixa estoque dos produtos comprados
     setProducts((prev) =>
       prev.map((prod) => {
-        const boughtQty = cart
+        const bought = cart
           .filter((c) => c.id === prod.id)
-          .reduce((sum, item) => sum + item.qty, 0);
-        if (boughtQty > 0) {
-          const updatedProd = { ...prod, stock: Math.max(0, prod.stock - boughtQty) };
-          syncSingleProductToSupabase(updatedProd);
-          return updatedProd;
+          .reduce((sum, c) => sum + c.quantity, 0);
+        if (bought > 0) {
+          const updated = { ...prod, stock: Math.max(0, prod.stock - bought) };
+          syncSingleProductToSupabase(updated);
+          return updated;
         }
         return prod;
       })
     );
 
-    setOrders((prev) => [newOrder, ...prev]);
-    syncOrderToSupabase(newOrder);
-    setCheckoutSuccess(newOrder);
+    // 3. Salva o pedido diretamente no Supabase
+    await syncNewOrderToSupabase(newOrder);
+
+    setOrderSuccess({
+      code,
+      customer: checkoutData.name,
+      total: cartTotal,
+      method: checkoutData.paymentMethod,
+      delivery: checkoutData.deliveryMethod
+    });
     setCart([]);
-    setCheckoutError('');
   };
 
-  // ============================================================================
-  // ASSISTENTE VIRTUAL MIMO ROSAS
-  // ============================================================================
-  const handleAssistantOption = (optionType) => {
-    let userLabel = '';
-    let botReply = '';
-    let recommendedProductId = null;
-
-    switch (optionType) {
-      case 'conhecer':
-        userLabel = 'Conhecer produtos';
-        botReply =
-          'Na Mimo Rosas criamos peças e infusões artesanais para tornar seu chimarrão e seus momentos ainda mais encantadores! Nossos campeões são as Infusões Florais e as Cápsulas de Chá em formato de Rosa. Veja este destaque:';
-        recommendedProductId = 'prod-1';
-        break;
-      case 'precos':
-        userLabel = 'Consultar preços';
-        botReply =
-          'Nossas Infusões e Cápsulas começam em R$ 19,90, Enfeites de Cuia a partir de R$ 18,90, Chaveiros personalizados por R$ 26,90 e Cuias Resinadas exclusivas a partir de R$ 119,90! 🌹';
-        recommendedProductId = 'prod-2';
-        break;
-      case 'presentes':
-        userLabel = 'Encontrar presentes';
-        botReply =
-          'Para presentear alguém especial, recomendo combinar uma Cuia Resinada Rosé Gold ou o nosso Chaveiro com Inicial e Pétalas Reais junto com as Cápsulas de Chá – Rosa! Olha que mimo encantador:';
-        recommendedProductId = 'prod-4';
-        break;
-      case 'duvidas':
-        userLabel = 'Tirar dúvidas';
-        botReply =
-          'Como usar as Cápsulas de Chá e Infusões? É super simples! Nas cápsulas, basta colocar 1 rosa na xícara com água quente ou sobre a erva do chimarrão. Todas são 100% comestíveis e artesanais.';
-        break;
-      case 'pedidos':
-        userLabel = 'Ajuda com pedidos';
-        botReply = `Você pode adicionar seus produtos favoritos ao carrinho e escolher entre Entrega por Transportadora/Correios (Frete Grátis acima de R$ ${storeConfig.freeShippingThreshold},00) ou Retirada. Se já fez um pedido, consulte na aba "Minha Conta"!`;
-        break;
-      default:
-        return;
-    }
-
-    setChatMessages((prev) => [
-      ...prev,
-      { id: `u-${Date.now()}`, sender: 'user', text: userLabel },
-      { id: `b-${Date.now() + 1}`, sender: 'bot', text: botReply, recommendedProductId }
-    ]);
-  };
-
-  const handleCustomChatSubmit = (e) => {
+  // Funções do Painel Admin (CRUD de Produtos + Pedidos)
+  const handleAdminUnlock = (e) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
-    const text = chatInput.trim();
-    setChatInput('');
-
-    const lower = text.toLowerCase();
-    let reply =
-      'Que alegria atender você! 🌹 Você pode tocar diretamente em um produto do catálogo para escolher a variação ou usar os botões rápidos acima para ver sugestões de presentes e preços.';
-    let recommendedProductId = null;
-
-    if (lower.includes('cuia') || lower.includes('resina')) {
-      reply = 'Nossas Cuias Resinadas são feitas à mão com porongo selecionado e folhas douradas! Veja a queridinha da coleção:';
-      recommendedProductId = 'prod-4';
-    } else if (lower.includes('rosa') || lower.includes('chá') || lower.includes('cha') || lower.includes('cápsula')) {
-      reply = 'As Cápsulas de Chá – Rosa derretem na água quente liberando pétalas perfumadas! Você pode adicionar direto por aqui:';
-      recommendedProductId = 'prod-2';
-    } else if (lower.includes('chimarrão') || lower.includes('infusão') || lower.includes('tererê')) {
-      reply = 'Nosso mix de Infusões para Chimarrão, Drinks e Tererê é o mais vendido da loja! Confira:';
-      recommendedProductId = 'prod-1';
-    }
-
-    setChatMessages((prev) => [
-      ...prev,
-      { id: `u-${Date.now()}`, sender: 'user', text },
-      { id: `b-${Date.now() + 1}`, sender: 'bot', text: reply, recommendedProductId }
-    ]);
-  };
-
-  // ============================================================================
-  // PROTEÇÃO E GESTÃO DO PAINEL ADMIN
-  // ============================================================================
-  const handleRequestAdminAccess = () => {
-    if (adminAuthenticated) {
-      setViewMode('admin');
+    const expected = storeConfig.adminPassword || 'mimo2026';
+    if (adminPinInput.trim() === expected) {
+      setIsAdminUnlocked(true);
+      setAdminPinError('');
+      try {
+        localStorage.setItem('mimo_admin_unlocked', 'true');
+      } catch {
+        // ignore
+      }
     } else {
-      setAdminPassInput('');
-      setAdminPassError('');
-      setShowAdminLoginModal(true);
-    }
-  };
-
-  const handleAdminLoginSubmit = (e) => {
-    e.preventDefault();
-    if (adminPassInput.trim() === adminPassword) {
-      setAdminAuthenticated(true);
-      setShowAdminLoginModal(false);
-      setViewMode('admin');
-      setAdminPassError('');
-    } else {
-      setAdminPassError('Senha incorreta. (Dica: a senha padrão é mimo2026)');
+      setAdminPinError('Senha incorreta. (Dica inicial: mimo2026)');
     }
   };
 
@@ -1392,11 +1888,17 @@ export default function App() {
     e.preventDefault();
     if (!editingProduct.name.trim()) return;
 
+    const cleanGallery =
+      Array.isArray(editingProduct.gallery) && editingProduct.gallery.length > 0
+        ? editingProduct.gallery
+        : [editingProduct.image];
+
     const formattedProduct = {
       ...editingProduct,
       price: Number(editingProduct.price) || 0,
       stock: Number(editingProduct.stock) || 0,
-      gallery: [editingProduct.image],
+      image: editingProduct.image || cleanGallery[0],
+      gallery: cleanGallery,
       variations:
         typeof editingProduct.variationsText === 'string'
           ? editingProduct.variationsText
@@ -1416,672 +1918,862 @@ export default function App() {
 
     syncSingleProductToSupabase(formattedProduct);
     setEditingProduct(null);
-    showAdminToast('Produto salvo e atualizado na Vitrine!');
+    showAdminToast('Produto salvo e sincronizado com o Supabase!');
   };
 
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
+  const handleDeleteProductAdmin = async (id) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+        await fetch(`${cleanUrl}/rest/v1/products?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: sbHeaders()
+        });
+      } catch {
+        // ignore
+      }
+    }
+    showAdminToast('Produto removido do catálogo.');
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
     setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const updated = { ...o, status: newStatus };
-          syncOrderToSupabase(updated);
-          return updated;
-        }
-        return o;
-      })
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
     );
-    showAdminToast(`Status do pedido ${orderId} atualizado para "${newStatus}"`);
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+        await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+          method: 'PATCH',
+          headers: sbHeaders(),
+          body: JSON.stringify({ status: newStatus })
+        });
+      } catch {
+        // ignore
+      }
+    }
+    showAdminToast(`Pedido ${orderId} atualizado para "${newStatus}"!`);
   };
 
-  const formatBRL = (value) =>
-    Number(value || 0).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    });
+  // Card de Produto Fiel à Imagem de Referência
+  const renderProductCard = (product) => {
+    const isFav = favorites.includes(product.id);
+    const isAdded = addedFeedbackId === product.id;
+
+    return (
+      <div
+        key={product.id}
+        onClick={() => openProductDetail(product)}
+        className="group bg-[#FFF9F3] rounded-[22px] overflow-hidden border border-[#F0DCD6] shadow-[0_6px_20px_rgba(121,83,68,0.07)] hover:shadow-[0_10px_26px_rgba(169,15,77,0.13)] transition-all duration-300 flex flex-col cursor-pointer"
+      >
+        <div className="relative aspect-[1.05/1] w-full overflow-hidden bg-[#F6E9E5]">
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+
+          {product.badge && (
+            <div className="absolute top-2.5 left-2.5 bg-[#FFF9F3]/95 backdrop-blur-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs border border-[#F2DFDA]">
+              {product.badgeType === 'star' ? (
+                <Star className="w-3.5 h-3.5 text-[#A90F4D]" strokeWidth={2.2} />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-[#A90F4D]" strokeWidth={2.2} />
+              )}
+              <span className="text-[11px] font-medium text-[#5A382E] leading-none">
+                {product.badge}
+              </span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => toggleFavorite(product.id, e)}
+            aria-label="Favoritar produto"
+            className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-[#FFF9F3]/85 backdrop-blur-xs flex items-center justify-center text-[#A90F4D] hover:scale-110 active:scale-95 transition-transform shadow-xs"
+          >
+            <Heart
+              className="w-4 h-4"
+              fill={isFav ? '#A90F4D' : 'none'}
+              strokeWidth={2}
+            />
+          </button>
+        </div>
+
+        <div className="p-3 sm:p-4 flex flex-col flex-1 justify-between text-center bg-gradient-to-b from-[#FFF9F3] to-[#FDF3EE]">
+          <div>
+            <h3 className="font-serif-display text-[15px] sm:text-[16px] font-medium text-[#4A2C23] leading-snug line-clamp-2 min-h-[40px]">
+              {product.name}
+            </h3>
+            <p className="mt-1.5 text-[18px] sm:text-[20px] font-bold text-[#A90F4D] tracking-tight">
+              {formatBRL(product.price)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => addToCart(product, 1, null, e)}
+            className={`mt-2.5 w-full py-2.5 px-3 rounded-full text-[12px] sm:text-[13px] font-medium flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 ${
+              isAdded
+                ? 'bg-[#2E7D32] text-white'
+                : 'bg-[#A90F4D] hover:bg-[#8E0B3F] text-white'
+            }`}
+          >
+            {isAdded ? (
+              <>
+                <Check className="w-4 h-4 stroke-[2.5]" />
+                <span>Adicionado!</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="w-3.5 h-3.5" />
+                <span>Adicionar ao carrinho</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-[#F5E6E2] text-[#4A2532] font-sans selection:bg-[#A90F4D] selection:text-white">
-      {/* Importação das Fontes Serifadas e Manuscritas Fiéis à Identidade Mimo Rosas */}
+    <div className="min-h-screen bg-[#F6E9E5] text-[#5A382E] flex flex-col items-center selection:bg-[#A90F4D] selection:text-white">
+      {/* Fontes Google elegantes idênticas à referência */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Allura&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-        .font-script { font-family: 'Allura', cursive; }
-        .font-serif-display { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .font-sans { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Allura&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        .font-script {
+          font-family: 'Allura', cursive;
+        }
+        .font-serif-display {
+          font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+        }
+        .font-sans-clean {
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}</style>
 
-      {/* BARRA SUPERIOR DISCRETA DE ALTERNÂNCIA VITRINE <-> SISTEMA ADMIN */}
-      <div className="bg-[#3B1924] text-[#FFF9F3] px-3 py-1.5 text-[11px] flex items-center justify-between border-b border-[#592838]">
+      {/* BARRA DE MODO (ALTERNAR ENTRE VITRINE E PAINEL ADMIN) */}
+      <div className="w-full bg-[#3A1C28] text-[#FFF9F3] px-3 py-1.5 text-xs flex items-center justify-between z-50 border-b border-[#A90F4D]/30">
         <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span
+            className={`w-2 h-2 rounded-full ${
+              sbStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+            }`}
+          />
           <span className="font-medium truncate">
-            Mimo Rosas • Loja + Sistema Integrado
+            Mimo Rosas •{' '}
+            <span className="opacity-80 hidden sm:inline">
+              {sbStatus.connected ? 'Supabase Conectado' : 'Loja + Sistema Admin'}
+            </span>
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setViewMode('store')}
-            className={`px-2.5 py-1 rounded-full font-semibold transition-all ${
-              viewMode === 'store'
+            type="button"
+            onClick={() => setAppMode('store')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
+              appMode === 'store'
                 ? 'bg-[#A90F4D] text-white shadow-xs'
-                : 'text-[#F6E9E5]/80 hover:text-white'
+                : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
             }`}
           >
-            🌹 Vitrine (Loja)
+            <Eye className="w-3 h-3" />
+            <span>Vitrine (Loja)</span>
           </button>
           <button
-            onClick={handleRequestAdminAccess}
-            className={`px-2.5 py-1 rounded-full font-semibold transition-all flex items-center gap-1 ${
-              viewMode === 'admin'
+            type="button"
+            onClick={() => setAppMode('admin')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
+              appMode === 'admin'
                 ? 'bg-[#A90F4D] text-white shadow-xs'
-                : 'text-[#F6E9E5]/80 hover:text-white'
+                : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
             }`}
           >
             <Settings className="w-3 h-3" />
-            Painel Admin ({orders.length})
+            <span>Painel Admin ({orders.length})</span>
           </button>
         </div>
       </div>
 
       {/* =====================================================================
-          VISÃO 1: PAINEL ADMINISTRATIVO (SISTEMA INTEGRADO OPÇÃO 1)
+          MODO 2: PAINEL ADMINISTRATIVO INTEGRADO (COM SENHA PARA VERCEL)
       ===================================================================== */}
-      {viewMode === 'admin' ? (
-        <div className="max-w-5xl mx-auto p-4 sm:p-6 pb-20 space-y-6">
-          {/* Cabeçalho do Sistema Admin */}
-          <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <RoseLogoSVG className="w-10 h-11" />
+      {appMode === 'admin' ? (
+        !isAdminUnlocked ? (
+          <div className="w-full max-w-md my-auto p-6 font-sans-clean">
+            <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EAD6D0] shadow-xl text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#F6E9E5] text-[#A90F4D] flex items-center justify-center mx-auto">
+                <Lock className="w-7 h-7" />
+              </div>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
-                  Sistema de Gestão Mimo Rosas
-                </span>
-                <h1 className="font-serif-display text-2xl font-bold text-[#4A2532] mt-0.5">
-                  Painel Administrativo Integrado
-                </h1>
-                <p className="text-xs text-[#795344]">
-                  Gerencie produtos, estoque, pedidos e banco de dados Supabase em tempo real
+                <h2 className="font-serif-display text-2xl font-bold text-[#4A2532]">
+                  Acesso Restrito • Mimo Rosas
+                </h2>
+                <p className="text-xs text-[#795344] mt-1">
+                  Digite a senha de administradora para gerenciar produtos, preços, pedidos e banco Supabase.
+                </p>
+              </div>
+
+              <form onSubmit={handleAdminUnlock} className="space-y-3 text-left">
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A382E] mb-1">
+                    Senha do Painel Admin
+                  </label>
+                  <input
+                    type="password"
+                    value={adminPinInput}
+                    onChange={(e) => setAdminPinInput(e.target.value)}
+                    placeholder="Digite a senha (padrão: mimo2026)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm focus:outline-none focus:border-[#A90F4D]"
+                  />
+                </div>
+                {adminPinError && (
+                  <p className="text-xs text-red-600 font-medium">{adminPinError}</p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm shadow-md"
+                >
+                  Entrar no Painel Administrativo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAppMode('store')}
+                  className="w-full py-2 rounded-full text-xs text-[#795344] hover:underline text-center"
+                >
+                  Voltar para a Loja
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full max-w-5xl min-h-screen bg-[#F6E9E5] p-4 sm:p-6 font-sans-clean space-y-6">
+            {adminToast && (
+              <div className="fixed bottom-5 right-5 z-50 bg-[#2E7D32] text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+                <Check className="w-4 h-4" />
+                <span>{adminToast}</span>
+              </div>
+            )}
+
+            {/* Topo do Sistema Admin */}
+            <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-6 border border-[#EAD6D0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <MimoRoseOutlineSVG className="w-10 h-11" />
+                <div>
+                  <h1 className="font-serif-display text-xl sm:text-2xl font-bold text-[#4A2532]">
+                    Sistema Mimo Rosas • Gestão Integrada
+                  </h1>
+                  <p className="text-xs text-[#795344]">
+                    Todas as edições salvam na Vitrine e no seu banco Supabase ({supabaseUrl.replace('https://', '')}).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setAppMode('store')}
+                  className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#E5CFC9] text-xs font-semibold hover:bg-[#A90F4D] hover:text-white transition-colors"
+                >
+                  Ver Loja ao Vivo →
+                </button>
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                <span className="text-[11px] text-[#795344] font-medium">Produtos Ativos</span>
+                <p className="text-2xl font-bold text-[#A90F4D] mt-1">
+                  {products.filter((p) => p.active !== false).length}
+                </p>
+              </div>
+              <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                <span className="text-[11px] text-[#795344] font-medium">Pedidos Recebidos</span>
+                <p className="text-2xl font-bold text-[#4A2532] mt-1">{orders.length}</p>
+              </div>
+              <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                <span className="text-[11px] text-[#795344] font-medium">Faturamento Total</span>
+                <p className="text-2xl font-bold text-[#2E7D32] mt-1">
+                  {formatBRL(orders.reduce((acc, o) => acc + Number(o.total || 0), 0))}
+                </p>
+              </div>
+              <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                <span className="text-[11px] text-[#795344] font-medium">Status Supabase</span>
+                <p
+                  className={`text-sm font-bold mt-2 flex items-center gap-1.5 ${
+                    sbStatus.connected ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {sbStatus.connected ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" /> Online e Sincronizado
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4" /> Aguardando Sincronia
+                    </>
+                  )}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('store')}
-                className="px-4 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm hover:bg-[#8E0B3F]"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                Ver Loja ao Vivo
-              </button>
-            </div>
-          </div>
 
-          {adminToast && (
-            <div className="bg-[#2E7D32] text-white px-4 py-3 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-md">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                {adminToast}
-              </span>
-              <button onClick={() => setAdminToast('')}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Abas do Painel Admin */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-            {[
-              { id: 'products', label: `Produtos & Estoque (${products.length})`, icon: Package },
-              { id: 'orders', label: `Pedidos (${orders.length})`, icon: ShoppingCart },
-              { id: 'assistant', label: 'IA Vendedora & Atendimento', icon: Bot },
-              { id: 'supabase', label: 'Banco Supabase & Publicação', icon: Database }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setAdminTab(tab.id)}
-                  className={`px-4 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 shrink-0 transition-all ${
-                    adminTab === tab.id
-                      ? 'bg-[#A90F4D] text-white shadow-sm'
-                      : 'bg-[#FFF9F3] text-[#795344] border border-[#E5CFC9] hover:border-[#A90F4D]'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ABA 1: PRODUTOS & ESTOQUE */}
-          {adminTab === 'products' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FFF9F3] p-4 rounded-3xl border border-[#EAD6D0]">
-                <div>
-                  <h2 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                    Catálogo de Produtos ({products.length})
-                  </h2>
-                  <p className="text-xs text-[#795344]">
-                    Qualquer alteração reflete na hora na Vitrine da Loja e no Supabase.
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setEditingProduct({
-                      id: `prod-${Date.now()}`,
-                      name: '',
-                      category: 'infusoes',
-                      price: 24.9,
-                      stock: 15,
-                      badge: 'Novo',
-                      badgeType: 'leaf',
-                      featured: true,
-                      active: true,
-                      image:
-                        'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
-                      variationsText: 'Padrão, Edição Presente',
-                      description: ''
-                    })
-                  }
-                  className="px-4 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  Novo Produto
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`bg-[#FFF9F3] rounded-2xl p-3.5 border flex gap-3.5 items-center ${
-                      p.active !== false ? 'border-[#EAD6D0]' : 'border-red-200 opacity-60'
+            {/* Abas do Sistema */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'products', label: 'Produtos & Estoque', icon: Package },
+                { id: 'orders', label: `Pedidos (${orders.length})`, icon: ClipboardList },
+                { id: 'assistant', label: 'IA Vendedora & Atendimento', icon: Bot },
+                { id: 'supabase', label: 'Banco Supabase & Publicação', icon: Database }
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAdminTab(tab.id)}
+                    className={`px-4 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 shrink-0 transition-all ${
+                      adminTab === tab.id
+                        ? 'bg-[#A90F4D] text-white shadow-sm'
+                        : 'bg-[#FFF9F3] text-[#5A382E] border border-[#E5CFC9]'
                     }`}
                   >
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-[#E5CFC9]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {p.featured && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
-                            Destaque
-                          </span>
-                        )}
-                        {p.badge && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                            {p.badge}
-                          </span>
-                        )}
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ABA 1: GESTÃO DE PRODUTOS */}
+            {adminTab === 'products' && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                  <div>
+                    <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                      Catálogo de Produtos ({products.length})
+                    </h2>
+                    <p className="text-xs text-[#795344]">
+                      Adicione novos produtos, envie fotos do celular/computador ou altere preços e estoque.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setUploadStatusMsg('');
+                      setEditingProduct({
+                        id: `prod-${Date.now()}`,
+                        name: '',
+                        category: 'infusoes',
+                        price: 24.9,
+                        stock: 15,
+                        badge: 'Novo',
+                        badgeType: 'leaf',
+                        featured: true,
+                        active: true,
+                        image:
+                          'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
+                        gallery: [
+                          'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85'
+                        ],
+                        variationsText: 'Padrão, Edição Presente',
+                        description: ''
+                      });
+                    }}
+                    className="px-4 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Novo Produto
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {products.map((p) => (
+                    <div
+                      key={p.id}
+                      className={`bg-[#FFF9F3] rounded-2xl p-3.5 border flex gap-3.5 items-center ${
+                        p.active !== false ? 'border-[#EAD6D0]' : 'border-red-200 opacity-60'
+                      }`}
+                    >
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        className="w-20 h-20 rounded-xl object-cover shrink-0 border border-[#E5CFC9]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {p.featured && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
+                              Destaque
+                            </span>
+                          )}
+                          {p.badge && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                              {p.badge}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-serif-display font-bold text-base text-[#4A2532] truncate mt-0.5">
+                          {p.name}
+                        </h3>
+                        <p className="text-xs font-bold text-[#A90F4D]">{formatBRL(p.price)}</p>
+                        <p className="text-[11px] text-[#795344]">
+                          Estoque: <strong>{p.stock} un.</strong>
+                        </p>
                       </div>
-                      <h3 className="font-serif-display font-bold text-base text-[#4A2532] truncate mt-0.5">
-                        {p.name}
-                      </h3>
-                      <p className="text-xs font-bold text-[#A90F4D]">{formatBRL(p.price)}</p>
-                      <p className="text-[11px] text-[#795344]">
-                        Estoque: <strong>{p.stock} un.</strong>
-                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        <button
+                          onClick={() => {
+                            setUploadStatusMsg('');
+                            setEditingProduct({
+                              ...p,
+                              gallery:
+                                Array.isArray(p.gallery) && p.gallery.length > 0
+                                  ? p.gallery
+                                  : [p.image],
+                              variationsText: (p.variations || []).join(', ')
+                            });
+                          }}
+                          className="p-2 rounded-xl bg-[#F6E9E5] text-[#A90F4D] hover:bg-[#A90F4D] hover:text-white transition-colors"
+                          title="Editar produto e enviar fotos"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProductAdmin(p.id)}
+                          className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                          title="Excluir produto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        onClick={() =>
-                          setEditingProduct({
-                            ...p,
-                            variationsText: (p.variations || []).join(', ')
-                          })
-                        }
-                        className="p-2 rounded-xl bg-[#F6E9E5] text-[#A90F4D] hover:bg-[#A90F4D] hover:text-white transition-colors"
-                        title="Editar produto"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const updated = { ...p, featured: !p.featured };
-                          setProducts((prev) =>
-                            prev.map((item) => (item.id === p.id ? updated : item))
-                          );
-                          syncSingleProductToSupabase(updated);
-                          showAdminToast(
-                            updated.featured
-                              ? 'Adicionado em Nossos Destaques!'
-                              : 'Removido dos Destaques.'
-                          );
-                        }}
-                        className={`p-2 rounded-xl transition-colors ${
-                          p.featured
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-[#F6E9E5] text-[#795344]'
-                        }`}
-                        title="Alternar Destaque na Home"
-                      >
-                        <Star className="w-4 h-4" />
-                      </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ABA 2: PEDIDOS RECEBIDOS */}
+            {adminTab === 'orders' && (
+              <div className="space-y-3.5">
+                <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
+                  <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                    Central de Pedidos
+                  </h2>
+                  <p className="text-xs text-[#795344]">
+                    Quando um cliente finaliza uma compra no Checkout da Loja, o pedido entra aqui e na tabela <code>orders</code> do seu Supabase.
+                  </p>
+                </div>
+
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0] space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F2DFDA] pb-2.5">
+                      <div>
+                        <span className="text-xs font-bold text-[#A90F4D]">{order.id}</span>
+                        <span className="text-xs text-[#795344] ml-2">• {order.createdAt}</span>
+                        <h3 className="font-bold text-sm text-[#4A2532] mt-0.5">
+                          {order.customerName} — {order.phone}
+                        </h3>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#DFC3BC]"
+                        >
+                          <option value="Aguardando PIX">Aguardando PIX</option>
+                          <option value="Pago">Pago</option>
+                          <option value="Em Produção">Em Produção</option>
+                          <option value="Enviado">Enviado</option>
+                          <option value="Concluído">Concluído</option>
+                        </select>
+                        <a
+                          href={`https://wa.me/55${order.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Olá ${order.customerName}! 🌹 Aqui é da Mimo Rosas sobre seu pedido ${order.id} (${order.status}).`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-full bg-[#25D366] text-white text-xs font-semibold"
+                        >
+                          Chamar no WhatsApp
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-[#795344] space-y-1">
+                      <p>
+                        <strong>Entrega:</strong> {order.address} ({order.cep})
+                      </p>
+                      <p>
+                        <strong>Itens:</strong>{' '}
+                        {order.items.map((i) => `${i.qty}x ${i.name}`).join(' | ')}
+                      </p>
+                      <p className="text-sm font-bold text-[#A90F4D] pt-1">
+                        Total do Pedido: {formatBRL(order.total)} ({order.paymentMethod.toUpperCase()})
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ABA 2: CENTRAL DE PEDIDOS */}
-          {adminTab === 'orders' && (
-            <div className="space-y-4">
-              <div className="bg-[#FFF9F3] p-4 rounded-3xl border border-[#EAD6D0] flex items-center justify-between">
-                <div>
-                  <h2 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                    Pedidos Recebidos ({orders.length})
-                  </h2>
-                  <p className="text-xs text-[#795344]">
-                    Acompanhe os pedidos feitos no Checkout da Loja e avise o cliente pelo WhatsApp.
-                  </p>
+            {/* ABA 3: CONFIGURAÇÃO DA IA VENDEDORA & LOJA */}
+            {adminTab === 'assistant' && (
+              <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-4">
+                <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                  Configurações da Assistente Virtual, Senha & Frete
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      WhatsApp Oficial (com DDD)
+                    </label>
+                    <input
+                      type="text"
+                      value={storeConfig.whatsappNumber}
+                      onChange={(e) =>
+                        setStoreConfig({ ...storeConfig, whatsappNumber: e.target.value })
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Frete Grátis acima de (R$)
+                    </label>
+                    <input
+                      type="number"
+                      value={storeConfig.freeShippingMin}
+                      onChange={(e) =>
+                        setStoreConfig({
+                          ...storeConfig,
+                          freeShippingMin: Number(e.target.value)
+                        })
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Senha do Painel Admin
+                    </label>
+                    <input
+                      type="text"
+                      value={storeConfig.adminPassword || 'mimo2026'}
+                      onChange={(e) =>
+                        setStoreConfig({
+                          ...storeConfig,
+                          adminPassword: e.target.value
+                        })
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                </div>
+                <div className="text-xs">
+                  <label className="block font-semibold mb-1">
+                    Mensagem de Boas-vindas da Assistente Mimo Rosas
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={storeConfig.assistantGreeting}
+                    onChange={(e) =>
+                      setStoreConfig({ ...storeConfig, assistantGreeting: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                  />
                 </div>
                 <button
-                  onClick={fetchFromSupabaseSilent}
-                  className="px-3.5 py-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] text-xs font-semibold flex items-center gap-1.5"
+                  onClick={() => {
+                    setChatMessages([
+                      {
+                        id: `welcome-${Date.now()}`,
+                        sender: 'bot',
+                        text: storeConfig.assistantGreeting,
+                        time: 'Agora'
+                      }
+                    ]);
+                    showAdminToast('Configurações atualizadas com sucesso!');
+                  }}
+                  className="px-5 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Atualizar
+                  Salvar Configurações
                 </button>
               </div>
+            )}
 
-              {orders.map((ord) => (
-                <div
-                  key={ord.id}
-                  className="bg-[#FFF9F3] rounded-3xl p-4 border border-[#EAD6D0] space-y-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#EFE0DC]">
+            {/* ABA 4: BANCO SUPABASE & PUBLICAÇÃO DIRETO PELO GITHUB + VERCEL */}
+            {adminTab === 'supabase' && (
+              <div className="space-y-5">
+                {/* CARD NOVO: ATIVAR UPLOAD DE FOTOS NO SUPABASE STORAGE */}
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#2E7D32] shadow-sm space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <span className="font-mono text-xs font-bold text-[#A90F4D]">{ord.id}</span>
-                      <span className="text-xs text-[#795344] ml-2">• {ord.createdAt}</span>
-                      <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                        {ord.customerName} — {ord.customerPhone}
-                      </h3>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        1.º Passo Recomendado • Upload de Fotos Reais
+                      </span>
+                      <h2 className="font-serif-display text-xl font-bold text-[#4A2532] mt-1">
+                        Ativar Galeria de Fotos no Supabase (Storage Bucket)
+                      </h2>
+                      <p className="text-xs text-[#795344]">
+                        Copie o comando abaixo e rode 1 vez no <strong>SQL Editor</strong> do seu Supabase para criar a pasta pública <code>products</code>. (Mesmo sem rodar, o painel já conta com compressão automática de fotos!)
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={ord.status}
-                        onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
-                        className="px-3 py-1.5 rounded-full bg-[#F6E9E5] border border-[#D4B2AA] text-xs font-bold text-[#A90F4D]"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        safeCopyText(
+                          SUPABASE_STORAGE_SQL_ONLY,
+                          'SQL do Bucket de Fotos (Storage)'
+                        )
+                      }
+                      className="px-4 py-2.5 rounded-full bg-[#2E7D32] hover:bg-[#256628] text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-xs"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copiar SQL do Storage
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-2xl bg-[#1D0C13] text-emerald-300 text-[11px] font-mono overflow-x-auto">
+                    {SUPABASE_STORAGE_SQL_ONLY}
+                  </pre>
+                </div>
+
+                {/* CARD 1: CONECTOR DIRETO DO SUPABASE */}
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#A90F4D] shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
+                        Conector em Tempo Real • Supabase Ativo
+                      </span>
+                      <h2 className="font-serif-display text-xl font-bold text-[#4A2532] mt-1">
+                        Conexão Direta com seu Projeto Supabase
+                      </h2>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 self-start ${
+                        sbStatus.connected
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {sbStatus.connected ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" /> Conectado ao Supabase
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-4 h-4" /> Aguardando Sincronia
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                    <div>
+                      <label className="block font-bold text-[#4A2532] mb-1">
+                        1. URL do seu Projeto Supabase
+                      </label>
+                      <input
+                        type="text"
+                        value={supabaseUrl}
+                        onChange={(e) => setSupabaseUrl(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#DFC3BC] font-mono text-[11px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#4A2532] mb-1">
+                        2. Sua Chave Pública (Publishable Key)
+                      </label>
+                      <input
+                        type="text"
+                        value={supabaseKey}
+                        onChange={(e) => setSupabaseKey(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#DFC3BC] font-mono text-[11px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-[#4A2532] flex items-center gap-2">
+                      <Database className="w-4 h-4 text-[#A90F4D] shrink-0" />
+                      <span>{sbStatus.message}</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => fetchFromSupabase(false)}
+                        disabled={sbStatus.loading}
+                        className="px-4 py-2 rounded-full bg-white text-[#A90F4D] border border-[#A90F4D] text-xs font-semibold flex items-center gap-1.5 hover:bg-[#F6E9E5] transition-colors"
                       >
-                        <option value="Pendente">Pendente</option>
-                        <option value="Pago">Pago</option>
-                        <option value="Em Produção">Em Produção</option>
-                        <option value="Enviado">Enviado</option>
-                        <option value="Concluído">Concluído</option>
-                      </select>
+                        <RefreshCw className={`w-3.5 h-3.5 ${sbStatus.loading ? 'animate-spin' : ''}`} />
+                        Testar / Recarregar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={seedInitialDataToSupabase}
+                        disabled={sbStatus.loading}
+                        className="px-4 py-2 rounded-full bg-[#2E7D32] hover:bg-[#256628] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Enviar os 16 Produtos e 8 Categorias para o Supabase
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CARD 2: PUBLICAR DIRETO PELO SITE DO GITHUB + VERCEL */}
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#4A2532] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#4A2532] text-white">
+                        Sem precisar instalar nada no computador
+                      </span>
+                      <h3 className="font-serif-display text-lg font-bold text-[#4A2532] mt-1">
+                        Publicar Direto pelo Site do GitHub + Vercel
+                      </h3>
+                      <p className="text-xs text-[#795344]">
+                        Clique em qualquer um dos 4 botões abaixo para copiar o código ou selecionar direto na caixa abaixo:
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
                       <a
-                        href={`https://wa.me/55${ord.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                          `Olá ${ord.customerName}! 🌹 Aqui é da Mimo Rosas sobre o seu pedido ${ord.id} (${ord.status}).`
-                        )}`}
+                        href="https://github.com/new"
                         target="_blank"
                         rel="noreferrer"
-                        className="px-3 py-1.5 rounded-full bg-[#25D366] text-white text-xs font-semibold flex items-center gap-1"
+                        className="px-3.5 py-2 rounded-full bg-[#24292F] text-white text-xs font-semibold flex items-center gap-1.5"
                       >
-                        <WhatsAppIcon className="w-3.5 h-3.5" />
-                        Chamar Cliente
+                        <span>1. Abrir GitHub</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      <a
+                        href="https://vercel.com/new"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3.5 py-2 rounded-full bg-black text-white text-xs font-semibold flex items-center gap-1.5"
+                      >
+                        <span>2. Abrir Vercel</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </div>
                   </div>
 
-                  <div className="text-xs text-[#795344] space-y-1">
-                    <p>
-                      <strong>Entrega:</strong>{' '}
-                      {ord.deliveryMethod === 'pickup'
-                        ? 'Retirada no Local'
-                        : `${ord.address} (CEP: ${ord.cep})`}
-                    </p>
-                    <p>
-                      <strong>Pagamento:</strong> {ord.paymentMethod.toUpperCase()} •{' '}
-                      <strong className="text-[#A90F4D]">Total: {formatBRL(ord.total)}</strong>
-                    </p>
-                  </div>
-
-                  <div className="bg-[#F6E9E5]/60 rounded-2xl p-3 space-y-1">
-                    {ord.items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs">
-                        <span>
-                          {item.qty}x {item.name} ({item.variation})
-                        </span>
-                        <span className="font-semibold">{formatBRL(item.price * item.qty)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ABA 3: CONFIGURAÇÃO DA IA VENDEDORA & FRETE */}
-          {adminTab === 'assistant' && (
-            <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-4">
-              <h2 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                Configurações da Assistente Virtual & Frete
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block font-semibold mb-1">WhatsApp Oficial da Loja</label>
-                  <input
-                    type="text"
-                    value={storeConfig.whatsappNumber}
-                    onChange={(e) =>
-                      setStoreConfig({ ...storeConfig, whatsappNumber: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">
-                    Meta de Frete Grátis (R$)
-                  </label>
-                  <input
-                    type="number"
-                    value={storeConfig.freeShippingThreshold}
-                    onChange={(e) =>
-                      setStoreConfig({
-                        ...storeConfig,
-                        freeShippingThreshold: Number(e.target.value)
-                      })
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                  />
-                </div>
-              </div>
-              <div className="text-xs">
-                <label className="block font-semibold mb-1">
-                  Mensagem de Boas-vindas da Assistente Virtual Mimo Rosas
-                </label>
-                <textarea
-                  rows={3}
-                  value={storeConfig.assistantGreeting}
-                  onChange={(e) =>
-                    setStoreConfig({ ...storeConfig, assistantGreeting: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                />
-              </div>
-              <button
-                onClick={() => showAdminToast('Configurações da Assistente salvas!')}
-                className="px-5 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
-              >
-                Salvar Configurações
-              </button>
-            </div>
-          )}
-
-          {/* ABA 4: BANCO SUPABASE & PUBLICAÇÃO DIRETO PELO GITHUB + VERCEL */}
-          {adminTab === 'supabase' && (
-            <div className="space-y-5">
-              {/* CARD 1: CONECTOR DIRETO DO SUPABASE */}
-              <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#A90F4D] shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#EFE0DC]">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
-                      Conector Direto Ativo
-                    </span>
-                    <h2 className="font-serif-display text-xl font-semibold text-[#4A2532] mt-1">
-                      Conexão em Tempo Real com seu Supabase
-                    </h2>
-                  </div>
-                  <button
-                    onClick={testSupabaseConnection}
-                    disabled={sbStatus.loading}
-                    className="px-4 py-2 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5 self-start"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${sbStatus.loading ? 'animate-spin' : ''}`} />
-                    Testar Conexão
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block font-semibold text-[#4A2532] mb-1">
-                      1. URL do seu Projeto Supabase
-                    </label>
-                    <input
-                      type="text"
-                      value={supabaseUrl}
-                      onChange={(e) => {
-                        setSupabaseUrl(e.target.value);
-                        try {
-                          localStorage.setItem('mimo_rosas_sb_url', e.target.value);
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="w-full px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] font-mono text-[11px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-[#4A2532] mb-1">
-                      2. Sua Chave Pública (Publishable Key)
-                    </label>
-                    <input
-                      type="text"
-                      value={supabaseKey}
-                      onChange={(e) => {
-                        setSupabaseKey(e.target.value);
-                        try {
-                          localStorage.setItem('mimo_rosas_sb_key', e.target.value);
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="w-full px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-
-                <div
-                  className={`p-3.5 rounded-2xl text-xs font-medium flex items-center justify-between gap-3 ${
-                    sbStatus.connected
-                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
-                      : 'bg-[#F6E9E5] text-[#4A2532] border border-[#E5CFC9]'
-                  }`}
-                >
-                  <span>{sbStatus.message}</span>
-                  <button
-                    onClick={seedInitialDataToSupabase}
-                    disabled={sbStatus.loading}
-                    className="px-4 py-2 rounded-xl bg-[#2E7D32] hover:bg-[#256628] text-white font-semibold shrink-0 shadow-xs"
-                  >
-                    Enviar os 16 Produtos e 8 Categorias para o Supabase
-                  </button>
-                </div>
-              </div>
-
-              {/* CARD 2: PUBLICAR NA VERCEL DIRETO PELO GITHUB WEB */}
-              <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#A90F4D] shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#EFE0DC]">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#2E7D32] text-white">
-                      Passo a Passo Direto pelo Site do GitHub (Sem instalar nada)
-                    </span>
-                    <h2 className="font-serif-display text-xl font-semibold text-[#4A2532] mt-1">
-                      Publicar na Vercel direto pelo navegador
-                    </h2>
-                    <p className="text-xs text-[#795344]">
-                      Crie um repositório em github.com/new, clique nos 4 botões abaixo para copiar cada arquivo e importe na Vercel!
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] space-y-3">
-                  <p className="text-xs font-bold text-[#4A2532]">
-                    📋 Clique em cada botão abaixo para copiar o conteúdo e criar o arquivo no GitHub (Add file &gt; Create new file):
-                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
                     <button
                       type="button"
                       onClick={() => {
-                        const pkg = JSON.stringify(
-                          {
-                            name: 'mimo-rosas-loja',
-                            private: true,
-                            version: '1.0.0',
-                            type: 'module',
-                            scripts: {
-                              dev: 'vite',
-                              build: 'vite build',
-                              preview: 'vite preview'
-                            },
-                            dependencies: {
-                              react: '^18.3.1',
-                              'react-dom': '^18.3.1',
-                              'lucide-react': '^0.460.0'
-                            },
-                            devDependencies: {
-                              '@vitejs/plugin-react': '^4.3.1',
-                              vite: '^5.4.1'
-                            }
-                          },
-                          null,
-                          2
-                        );
-                        setSelectedFilePreview({ filename: 'package.json', content: pkg });
-                        safeCopyText(pkg, 'Arquivo package.json');
+                        setSelectedFilePreview({
+                          title: 'Arquivo 1: package.json',
+                          code: GITHUB_FILES.packageJson
+                        });
+                        safeCopyText(GITHUB_FILES.packageJson, 'package.json');
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all group ${
-                        selectedFilePreview.filename === 'package.json'
-                          ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                          : 'bg-[#FFF9F3] hover:bg-[#A90F4D] hover:text-white border-[#D4B2AA]'
-                      }`}
+                      className="p-3 rounded-2xl bg-[#F6E9E5] hover:bg-[#EAD6D0] border border-[#DFC3BC] text-left transition-colors flex flex-col justify-between"
                     >
-                      <span
-                        className={`text-[10px] font-bold uppercase block ${
-                          selectedFilePreview.filename === 'package.json'
-                            ? 'text-[#F6E9E5]'
-                            : 'text-[#A90F4D] group-hover:text-[#F6E9E5]'
-                        }`}
-                      >
-                        Arquivo 1
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A90F4D] uppercase">
+                          Arquivo 1
+                        </span>
+                        <p className="font-mono font-bold text-sm text-[#4A2532] mt-0.5">
+                          package.json
+                        </p>
+                      </div>
+                      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#A90F4D]">
+                        <Copy className="w-3 h-3" /> Copiar / Mostrar código
                       </span>
-                      <span className="font-mono font-bold text-xs block mt-0.5">package.json</span>
-                      <span className="text-[10px] opacity-80 block mt-1">Clique para copiar/ver</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        const html = [
-                          '<!doctype html>',
-                          '<html lang="pt-BR">',
-                          '  <head>',
-                          '    <meta charset="UTF-8" />',
-                          '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-                          '    <title>Mimo Rosas • Presentes, Aromas e Sabores</title>',
-                          '    <script src="https://cdn.tailwindcss.com"></script>',
-                          '  </head>',
-                          '  <body class="bg-[#FFF9F3] m-0 p-0">',
-                          '    <div id="root"></div>',
-                          '    <script type="module" src="/src/main.jsx"></script>',
-                          '  </body>',
-                          '</html>'
-                        ].join('\n');
-                        setSelectedFilePreview({ filename: 'index.html', content: html });
-                        safeCopyText(html, 'Arquivo index.html');
+                        setSelectedFilePreview({
+                          title: 'Arquivo 2: index.html',
+                          code: GITHUB_FILES.indexHtml
+                        });
+                        safeCopyText(GITHUB_FILES.indexHtml, 'index.html');
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all group ${
-                        selectedFilePreview.filename === 'index.html'
-                          ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                          : 'bg-[#FFF9F3] hover:bg-[#A90F4D] hover:text-white border-[#D4B2AA]'
-                      }`}
+                      className="p-3 rounded-2xl bg-[#F6E9E5] hover:bg-[#EAD6D0] border border-[#DFC3BC] text-left transition-colors flex flex-col justify-between"
                     >
-                      <span
-                        className={`text-[10px] font-bold uppercase block ${
-                          selectedFilePreview.filename === 'index.html'
-                            ? 'text-[#F6E9E5]'
-                            : 'text-[#A90F4D] group-hover:text-[#F6E9E5]'
-                        }`}
-                      >
-                        Arquivo 2
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A90F4D] uppercase">
+                          Arquivo 2
+                        </span>
+                        <p className="font-mono font-bold text-sm text-[#4A2532] mt-0.5">
+                          index.html
+                        </p>
+                      </div>
+                      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#A90F4D]">
+                        <Copy className="w-3 h-3" /> Copiar / Mostrar código
                       </span>
-                      <span className="font-mono font-bold text-xs block mt-0.5">index.html</span>
-                      <span className="text-[10px] opacity-80 block mt-1">Clique para copiar/ver</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        const viteCfg = [
-                          "import { defineConfig } from 'vite'",
-                          "import react from '@vitejs/plugin-react'",
-                          '',
-                          'export default defineConfig({',
-                          '  plugins: [react()],',
-                          '})'
-                        ].join('\n');
-                        setSelectedFilePreview({ filename: 'vite.config.js', content: viteCfg });
-                        safeCopyText(viteCfg, 'Arquivo vite.config.js');
+                        setSelectedFilePreview({
+                          title: 'Arquivo 3: vite.config.js',
+                          code: GITHUB_FILES.viteConfig
+                        });
+                        safeCopyText(GITHUB_FILES.viteConfig, 'vite.config.js');
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all group ${
-                        selectedFilePreview.filename === 'vite.config.js'
-                          ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                          : 'bg-[#FFF9F3] hover:bg-[#A90F4D] hover:text-white border-[#D4B2AA]'
-                      }`}
+                      className="p-3 rounded-2xl bg-[#F6E9E5] hover:bg-[#EAD6D0] border border-[#DFC3BC] text-left transition-colors flex flex-col justify-between"
                     >
-                      <span
-                        className={`text-[10px] font-bold uppercase block ${
-                          selectedFilePreview.filename === 'vite.config.js'
-                            ? 'text-[#F6E9E5]'
-                            : 'text-[#A90F4D] group-hover:text-[#F6E9E5]'
-                        }`}
-                      >
-                        Arquivo 3
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A90F4D] uppercase">
+                          Arquivo 3
+                        </span>
+                        <p className="font-mono font-bold text-sm text-[#4A2532] mt-0.5">
+                          vite.config.js
+                        </p>
+                      </div>
+                      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#A90F4D]">
+                        <Copy className="w-3 h-3" /> Copiar / Mostrar código
                       </span>
-                      <span className="font-mono font-bold text-xs block mt-0.5">
-                        vite.config.js
-                      </span>
-                      <span className="text-[10px] opacity-80 block mt-1">Clique para copiar/ver</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        const mainJsx = [
-                          "import React from 'react'",
-                          "import ReactDOM from 'react-dom/client'",
-                          "import App from './App.jsx'",
-                          '',
-                          "ReactDOM.createRoot(document.getElementById('root')).render(",
-                          '  <React.StrictMode>',
-                          '    <App />',
-                          '  </React.StrictMode>,',
-                          ')'
-                        ].join('\n');
-                        setSelectedFilePreview({ filename: 'src/main.jsx', content: mainJsx });
-                        safeCopyText(mainJsx, 'Arquivo src/main.jsx');
+                        setSelectedFilePreview({
+                          title: 'Arquivo 4: src/main.jsx',
+                          code: GITHUB_FILES.mainJsx
+                        });
+                        safeCopyText(GITHUB_FILES.mainJsx, 'src/main.jsx');
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all group ${
-                        selectedFilePreview.filename === 'src/main.jsx'
-                          ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                          : 'bg-[#FFF9F3] hover:bg-[#A90F4D] hover:text-white border-[#D4B2AA]'
-                      }`}
+                      className="p-3 rounded-2xl bg-[#F6E9E5] hover:bg-[#EAD6D0] border border-[#DFC3BC] text-left transition-colors flex flex-col justify-between"
                     >
-                      <span
-                        className={`text-[10px] font-bold uppercase block ${
-                          selectedFilePreview.filename === 'src/main.jsx'
-                            ? 'text-[#F6E9E5]'
-                            : 'text-[#A90F4D] group-hover:text-[#F6E9E5]'
-                        }`}
-                      >
-                        Arquivo 4
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A90F4D] uppercase">
+                          Arquivo 4
+                        </span>
+                        <p className="font-mono font-bold text-sm text-[#4A2532] mt-0.5">
+                          src/main.jsx
+                        </p>
+                      </div>
+                      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#A90F4D]">
+                        <Copy className="w-3 h-3" /> Copiar / Mostrar código
                       </span>
-                      <span className="font-mono font-bold text-xs block mt-0.5">
-                        src/main.jsx
-                      </span>
-                      <span className="text-[10px] opacity-80 block mt-1">Clique para copiar/ver</span>
                     </button>
                   </div>
 
-                  {/* Caixa de Código Visível e Selecionável para Cópia Direta */}
-                  <div className="bg-[#2B141D] rounded-2xl p-3.5 text-[#F6E9E5] space-y-2">
+                  {/* CAIXA DE CÓDIGO VISÍVEL E SELECIONÁVEL */}
+                  <div className="bg-[#1D0C13] rounded-2xl p-3.5 text-pink-100 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-amber-300">
-                        📄 Conteúdo de: {selectedFilePreview.filename}
+                      <span className="text-xs font-bold text-pink-300 font-mono">
+                        {selectedFilePreview.title}
                       </span>
                       <button
                         type="button"
@@ -2089,12 +2781,9 @@ export default function App() {
                           if (codePreviewTextareaRef.current) {
                             codePreviewTextareaRef.current.select();
                           }
-                          safeCopyText(
-                            selectedFilePreview.content,
-                            `Arquivo ${selectedFilePreview.filename}`
-                          );
+                          safeCopyText(selectedFilePreview.code, selectedFilePreview.title);
                         }}
-                        className="px-3 py-1 rounded-lg bg-[#A90F4D] hover:bg-[#C2185B] text-white text-[11px] font-semibold flex items-center gap-1"
+                        className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1"
                       >
                         <Copy className="w-3 h-3" />
                         Selecionar e Copiar
@@ -2103,93 +2792,132 @@ export default function App() {
                     <textarea
                       ref={codePreviewTextareaRef}
                       readOnly
-                      rows={8}
-                      value={selectedFilePreview.content}
+                      value={selectedFilePreview.code}
                       onClick={(e) => e.target.select()}
-                      className="w-full bg-[#1D0C13] text-[#F6E9E5] font-mono text-[11px] p-3 rounded-xl border border-[#592838] focus:outline-none"
+                      rows={8}
+                      className="w-full bg-[#2A121C] text-pink-100 font-mono text-[11px] p-3 rounded-xl border border-pink-900/40 focus:outline-none"
                     />
                   </div>
-
-                  <p className="text-[11px] text-[#795344]">
-                    💡 E o <strong>Arquivo 5</strong> é o <code>src/App.jsx</code>: basta copiar o código completo deste editor (na aba Code ao lado de Preview) e colar nele!
-                  </p>
                 </div>
 
-                {/* Senha do Painel Admin para quando estiver na Vercel */}
-                <div className="p-4 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div>
-                    <p className="font-bold text-[#4A2532]">
-                      🔒 Senha de Acesso ao Painel Admin (Proteção para o site público):
-                    </p>
-                    <p className="text-[11px] text-[#795344]">
-                      Quando clientes acessarem seu link da Vercel, somente quem tiver esta senha poderá abrir o Painel Admin.
-                    </p>
+                {/* CARD 2.5: CONECTAR DOMÍNIO PRÓPRIO MIMOROSAS.COM.BR */}
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border-2 border-[#A90F4D] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#A90F4D] text-white">
+                        Domínio Próprio Oficial
+                      </span>
+                      <h3 className="font-serif-display text-lg font-bold text-[#4A2532] mt-1">
+                        Como ativar o seu domínio <code>mimorosas.com.br</code> na Vercel
+                      </h3>
+                      <p className="text-xs text-[#795344]">
+                        Em <strong>Settings &gt; Domains</strong> na Vercel, adicione <code>mimorosas.com.br</code> e configure estes 2 apontamentos no painel onde você comprou o domínio (ex: Registro.br, Hostinger, GoDaddy):
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={adminPassword}
-                      onChange={(e) => {
-                        setAdminPassword(e.target.value);
-                        try {
-                          localStorage.setItem('mimo_rosas_admin_pwd', e.target.value);
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                      className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#D4B2AA] font-mono text-xs font-bold text-[#A90F4D] w-36"
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#A90F4D] uppercase text-[10px]">
+                          Apontamento 1 • Domínio Raiz
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => safeCopyText('216.198.79.1', 'IP 216.198.79.1')}
+                          className="px-2.5 py-1 rounded-full bg-[#A90F4D] text-white text-[10px] font-semibold flex items-center gap-1"
+                        >
+                          <Copy className="w-3 h-3" /> Copiar IP
+                        </button>
+                      </div>
+                      <p className="text-[#4A2532]">
+                        <strong>Tipo:</strong> <code>A</code> &nbsp;|&nbsp; <strong>Nome:</strong>{' '}
+                        <code>@</code> (ou em branco no Registro.br)
+                      </p>
+                      <p className="font-mono font-bold text-sm text-[#4A2532]">
+                        Valor / Destino: 216.198.79.1
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#A90F4D] uppercase text-[10px]">
+                          Apontamento 2 • Subdomínio WWW
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            safeCopyText(
+                              'e05a5a12a124d8d9.vercel-dns-017.com.',
+                              'CNAME da Vercel'
+                            )
+                          }
+                          className="px-2.5 py-1 rounded-full bg-[#A90F4D] text-white text-[10px] font-semibold flex items-center gap-1"
+                        >
+                          <Copy className="w-3 h-3" /> Copiar CNAME
+                        </button>
+                      </div>
+                      <p className="text-[#4A2532]">
+                        <strong>Tipo:</strong> <code>CNAME</code> &nbsp;|&nbsp;{' '}
+                        <strong>Nome:</strong> <code>www</code>
+                      </p>
+                      <p className="font-mono font-bold text-xs text-[#4A2532] break-all">
+                        Valor / Destino: e05a5a12a124d8d9.vercel-dns-017.com.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CARD 3: SCRIPT SQL COMPLETO DO SUPABASE */}
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-serif-display text-base font-bold text-[#4A2532]">
+                        Script SQL Completo (Tabelas + Storage de Fotos)
+                      </h3>
+                      <p className="text-xs text-[#795344]">
+                        Use apenas se precisar recriar as tabelas no menu <strong>SQL Editor</strong> do Supabase.
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => showAdminToast('Senha do Admin atualizada!')}
-                      className="px-3.5 py-2 rounded-xl bg-[#A90F4D] text-white font-semibold"
+                      onClick={() => safeCopyText(SUPABASE_SQL_SCHEMA, 'SQL do Supabase')}
+                      className="px-4 py-2 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5 self-start"
                     >
-                      Salvar Senha
+                      <Copy className="w-3.5 h-3.5" />
+                      Copiar SQL do Supabase
                     </button>
                   </div>
+
+                  <pre className="p-4 rounded-2xl bg-[#1D0C13] text-pink-100 text-[11px] font-mono overflow-x-auto max-h-60">
+                    {SUPABASE_SQL_SCHEMA}
+                  </pre>
                 </div>
               </div>
+            )}
 
-              {/* CARD 3: SCRIPT SQL DO SUPABASE */}
-              <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                    Script SQL das Tabelas (Supabase SQL Editor)
-                  </h3>
-                  <button
-                    onClick={() => safeCopyText(SUPABASE_SQL_SCRIPT, 'Script SQL do Supabase')}
-                    className="px-3.5 py-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D] text-xs font-semibold flex items-center gap-1.5"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    Copiar SQL do Supabase
-                  </button>
-                </div>
-                <pre className="p-3.5 rounded-2xl bg-[#2B141D] text-[#F6E9E5] text-[11px] font-mono overflow-x-auto max-h-56">
-                  {SUPABASE_SQL_SCRIPT}
-                </pre>
-              </div>
-            </div>
-          )}
+            {/* MODAL DE CRIAR / EDITAR PRODUTO NO PAINEL ADMIN COM UPLOAD DE FOTOS */}
+            {editingProduct && (
+              <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
+                <form
+                  onSubmit={handleSaveProductAdmin}
+                  className="bg-[#FFF9F3] w-full max-w-lg rounded-3xl p-5 border border-[#EAD6D0] shadow-2xl space-y-3.5 max-h-[92vh] overflow-y-auto text-xs"
+                >
+                  <div className="flex items-center justify-between border-b border-[#F2DFDA] pb-2.5">
+                    <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                      Editar / Cadastrar Produto
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditingProduct(null)}
+                      className="p-1.5 rounded-full bg-[#F6E9E5] text-[#4A2532]"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
-          {/* MODAL DE CRIAÇÃO / EDIÇÃO DE PRODUTO NO ADMIN */}
-          {editingProduct && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/70 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-[#FFF9F3] rounded-3xl max-w-lg w-full p-5 border border-[#EAD6D0] shadow-2xl max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between pb-3 border-b border-[#EFE0DC]">
-                  <h3 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                    Editar / Criar Produto
-                  </h3>
-                  <button
-                    onClick={() => setEditingProduct(null)}
-                    className="p-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveProductAdmin} className="space-y-3 mt-4 text-xs">
                   <div>
-                    <label className="block font-semibold mb-1">Nome do Produto</label>
+                    <label className="block font-semibold mb-1">Nome do Produto *</label>
                     <input
                       type="text"
                       required
@@ -2200,33 +2928,7 @@ export default function App() {
                       className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-semibold mb-1">Preço (R$)</label>
-                      <input
-                        type="number"
-                        step="0.10"
-                        required
-                        value={editingProduct.price}
-                        onChange={(e) =>
-                          setEditingProduct({ ...editingProduct, price: e.target.value })
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1">Estoque</label>
-                      <input
-                        type="number"
-                        required
-                        value={editingProduct.stock}
-                        onChange={(e) =>
-                          setEditingProduct({ ...editingProduct, stock: e.target.value })
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                      />
-                    </div>
-                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block font-semibold mb-1">Categoria</label>
@@ -2239,10 +2941,38 @@ export default function App() {
                       >
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name}
+                            {c.shortName}
                           </option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Preço (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={editingProduct.price}
+                        onChange={(e) =>
+                          setEditingProduct({ ...editingProduct, price: e.target.value })
+                        }
+                        className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold mb-1">Estoque (un.)</label>
+                      <input
+                        type="number"
+                        required
+                        value={editingProduct.stock}
+                        onChange={(e) =>
+                          setEditingProduct({ ...editingProduct, stock: e.target.value })
+                        }
+                        className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                      />
                     </div>
                     <div>
                       <label className="block font-semibold mb-1">
@@ -2258,18 +2988,166 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block font-semibold mb-1">URL da Foto do Produto</label>
-                    <input
-                      type="text"
-                      required
-                      value={editingProduct.image}
-                      onChange={(e) =>
-                        setEditingProduct({ ...editingProduct, image: e.target.value })
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                    />
+
+                  {/* SEÇÃO DE UPLOAD DE FOTOS DIRETO DO CELULAR OU COMPUTADOR */}
+                  <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-[#4A2532] flex items-center gap-1.5">
+                        <Camera className="w-4 h-4 text-[#A90F4D]" />
+                        <span>Fotos do Produto (Capa + Galeria)</span>
+                      </label>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FFF9F3] text-[#A90F4D]">
+                        Supabase Storage + Auto-Compressão
+                      </span>
+                    </div>
+
+                    {/* Preview da Foto Principal + Botões de Upload */}
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-[#FFF9F3] border-2 border-[#A90F4D] shrink-0 shadow-xs">
+                        {editingProduct.image ? (
+                          <img
+                            src={editingProduct.image}
+                            alt="Preview Capa"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[#795344]">
+                            <ImageIcon className="w-6 h-6" />
+                          </div>
+                        )}
+                        <span className="absolute bottom-1 left-1 right-1 bg-[#A90F4D]/90 text-white text-[9px] font-bold text-center py-0.5 rounded-md">
+                          Foto Principal
+                        </span>
+                      </div>
+
+                      <div className="flex-1 space-y-2">
+                        {/* Input oculto para Foto Principal */}
+                        <input
+                          ref={mainImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadProductPhoto(file, 'main');
+                            e.target.value = '';
+                          }}
+                        />
+
+                        {/* Input oculto para Adicionar na Galeria */}
+                        <input
+                          ref={galleryImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadProductPhoto(file, 'gallery');
+                            e.target.value = '';
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          disabled={uploadingImage}
+                          onClick={() => mainImageInputRef.current?.click()}
+                          className="w-full py-2.5 px-3 rounded-xl bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-60"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span>
+                            {uploadingImage
+                              ? 'Enviando foto...'
+                              : 'Enviar Foto do Celular / Computador'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={uploadingImage}
+                          onClick={() => galleryImageInputRef.current?.click()}
+                          className="w-full py-1.5 px-3 rounded-xl bg-[#FFF9F3] hover:bg-white text-[#A90F4D] border border-[#D4B2AA] font-semibold flex items-center justify-center gap-1.5 text-[11px]"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Adicionar foto extra na galeria</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {uploadStatusMsg && (
+                      <div className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-[11px] font-medium text-[#4A2532]">
+                        {uploadStatusMsg}
+                      </div>
+                    )}
+
+                    {/* Miniaturas da Galeria do Produto */}
+                    {Array.isArray(editingProduct.gallery) && editingProduct.gallery.length > 1 && (
+                      <div className="space-y-1">
+                        <span className="text-[10.5px] font-semibold text-[#795344]">
+                          Galeria ({editingProduct.gallery.length} fotos — toque para definir como principal):
+                        </span>
+                        <div className="flex items-center gap-2 overflow-x-auto py-1">
+                          {editingProduct.gallery.map((imgUrl, idx) => {
+                            const isMain = editingProduct.image === imgUrl;
+                            return (
+                              <div
+                                key={idx}
+                                className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer ${
+                                  isMain ? 'border-[#A90F4D]' : 'border-white'
+                                }`}
+                                onClick={() =>
+                                  setEditingProduct({ ...editingProduct, image: imgUrl })
+                                }
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`Galeria ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const filtered = editingProduct.gallery.filter(
+                                      (_, i) => i !== idx
+                                    );
+                                    setEditingProduct({
+                                      ...editingProduct,
+                                      gallery: filtered,
+                                      image:
+                                        editingProduct.image === imgUrl
+                                          ? filtered[0] || ''
+                                          : editingProduct.image
+                                    });
+                                  }}
+                                  className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center text-[9px]"
+                                  title="Remover foto"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Campo opcional para colar link externo se desejar */}
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-[#795344] mb-1">
+                        Ou cole o link (URL) da imagem manualmente:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingProduct.image}
+                        onChange={(e) =>
+                          setEditingProduct({ ...editingProduct, image: e.target.value })
+                        }
+                        className="w-full px-3 py-1.5 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-[11px]"
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <label className="block font-semibold mb-1">
                       Variações (separadas por vírgula)
@@ -2278,39 +3156,51 @@ export default function App() {
                       type="text"
                       value={editingProduct.variationsText || ''}
                       onChange={(e) =>
-                        setEditingProduct({ ...editingProduct, variationsText: e.target.value })
+                        setEditingProduct({
+                          ...editingProduct,
+                          variationsText: e.target.value
+                        })
                       }
                       className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
                   </div>
+
                   <div>
-                    <label className="block font-semibold mb-1">Descrição Detalhada</label>
+                    <label className="block font-semibold mb-1">Descrição</label>
                     <textarea
                       rows={3}
                       value={editingProduct.description || ''}
                       onChange={(e) =>
-                        setEditingProduct({ ...editingProduct, description: e.target.value })
+                        setEditingProduct({
+                          ...editingProduct,
+                          description: e.target.value
+                        })
                       }
                       className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
                   </div>
+
                   <div className="flex items-center gap-4 pt-1">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={editingProduct.featured}
+                        checked={Boolean(editingProduct.featured)}
                         onChange={(e) =>
-                          setEditingProduct({ ...editingProduct, featured: e.target.checked })
+                          setEditingProduct({
+                            ...editingProduct,
+                            featured: e.target.checked
+                          })
                         }
                       />
                       <span>Exibir em "Nossos Destaques"</span>
                     </label>
                   </div>
-                  <div className="flex justify-end gap-2 pt-3">
+
+                  <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => setEditingProduct(null)}
-                      className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#4A2532] font-semibold"
+                      className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#5A382E] font-semibold"
                     >
                       Cancelar
                     </button>
@@ -2318,1322 +3208,1165 @@ export default function App() {
                       type="submit"
                       className="px-5 py-2 rounded-full bg-[#A90F4D] text-white font-semibold"
                     >
-                      Salvar Produto
+                      Salvar no Catálogo
                     </button>
                   </div>
                 </form>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )
       ) : (
-        /* ===================================================================
-           VISÃO 2: VITRINE DA LOJA VIRTUAL MIMO ROSAS (FIEL À IMAGEM ANEXADA)
-        =================================================================== */
-        <div className="max-w-[480px] mx-auto bg-[#FFF9F3] min-h-screen shadow-2xl relative pb-24 overflow-x-hidden border-x border-[#EAD6D0]/60">
-          {/* Notificação Flutuante da Loja */}
-          {storeToast && (
-            <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-[#4A2532] text-[#FFF9F3] px-4 py-2 rounded-full text-xs font-medium shadow-lg flex items-center gap-2 animate-bounce">
-              <Sparkles className="w-3.5 h-3.5 text-[#F6E9E5]" />
-              <span>{storeToast}</span>
-            </div>
-          )}
-
-          {/* 1. CABEÇALHO FIEL À REFERÊNCIA (Menu, Logo Mimo Rosas, Pesquisa e Carrinho) */}
-          <header className="sticky top-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md px-4 py-2.5 border-b border-[#F0DFDA] flex items-center justify-between">
-            <button
-              onClick={() => setSideMenuOpen(true)}
-              aria-label="Abrir menu"
-              className="p-1.5 text-[#A90F4D] hover:bg-[#F6E9E5] rounded-xl transition-colors"
-            >
-              <Menu className="w-6 h-6 stroke-[2]" />
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('home');
-                setSelectedCategory('all');
-                setSearchQuery('');
-              }}
-              className="flex items-center gap-2 group"
-            >
-              <RoseLogoSVG className="w-9 h-10 transition-transform group-hover:scale-105" />
-              <span className="font-script text-[36px] leading-none text-[#A90F4D] tracking-normal pt-1">
-                Mimo Rosas
-              </span>
-            </button>
-
-            <div className="flex items-center gap-1.5">
+        /* =====================================================================
+           MODO 1: VITRINE DA LOJA VIRTUAL (100% FIEL À IMAGEM DE REFERÊNCIA)
+        ===================================================================== */
+        <div className="w-full max-w-[480px] md:max-w-[960px] min-h-screen bg-[#F6E9E5] shadow-[0_0_50px_rgba(121,83,68,0.15)] flex flex-col relative pb-24 font-sans-clean">
+          {/* 1. CABEÇALHO FIEL À IMAGEM */}
+          <header className="sticky top-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md border-b border-[#EFE0DC] px-4 py-2.5">
+            <div className="flex items-center justify-between">
               <button
-                onClick={() => setSearchOpen((prev) => !prev)}
-                aria-label="Pesquisar produtos"
-                className="p-1.5 text-[#A90F4D] hover:bg-[#F6E9E5] rounded-xl transition-colors"
+                type="button"
+                onClick={() => setIsSideMenuOpen(true)}
+                aria-label="Abrir menu"
+                className="p-2 -ml-1 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"
               >
-                <Search className="w-5 h-5 stroke-[2.1]" />
+                <Menu className="w-6 h-6" strokeWidth={1.9} />
               </button>
 
               <button
-                onClick={() => setCartOpen(true)}
-                aria-label="Abrir carrinho"
-                className="relative p-1.5 text-[#A90F4D] hover:bg-[#F6E9E5] rounded-xl transition-colors"
+                type="button"
+                onClick={() => {
+                  setActiveView('home');
+                  setSelectedCategory('all');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="flex items-center gap-2 focus:outline-none group"
               >
-                <ShoppingCart className="w-5 h-5 stroke-[2.1]" />
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#A90F4D] text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
-                  {cartCount}
+                <MimoRoseOutlineSVG className="w-10 h-11 sm:w-11 sm:h-12 group-hover:scale-105 transition-transform" />
+                <span className="font-script text-[36px] sm:text-[42px] text-[#A90F4D] leading-none tracking-wide pt-1">
+                  Mimo Rosas
                 </span>
               </button>
-            </div>
-          </header>
 
-          {/* BARRA DE PESQUISA EXPANSÍVEL */}
-          {searchOpen && (
-            <div className="bg-[#F6E9E5] px-4 py-2.5 border-b border-[#E8D2CC] flex items-center gap-2">
-              <Search className="w-4 h-4 text-[#A90F4D] shrink-0" />
-              <input
-                type="text"
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (activeTab !== 'home' && activeTab !== 'categories') {
-                    setActiveTab('home');
-                  }
-                }}
-                placeholder="Buscar infusões, cápsulas de rosa, cuias..."
-                className="w-full bg-transparent text-xs text-[#4A2532] placeholder-[#795344]/70 focus:outline-none"
-              />
-              {searchQuery && (
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="text-[11px] text-[#A90F4D] font-semibold"
+                  type="button"
+                  onClick={() => setIsSearchOpen((prev) => !prev)}
+                  aria-label="Pesquisar produtos"
+                  className="p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"
                 >
-                  Limpar
+                  <Search className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
                 </button>
-              )}
-            </div>
-          )}
 
-          {/* CONTEÚDO PRINCIPAL DE ACORDO COM A ABA SELECIONADA */}
-          {activeTab === 'home' && (
-            <main>
-              {/* 2. BANNER PRINCIPAL FIEL À IMAGEM DE REFERÊNCIA */}
-              <section className="relative overflow-hidden bg-gradient-to-br from-[#F4DCE0] via-[#F6E9E5] to-[#E8C5C8] pt-5 pb-12 px-4">
-                {/* Fundo fotográfico suave à direita */}
-                <div className="grid grid-cols-12 items-center gap-2 relative z-10">
-                  <div className="col-span-7 pr-1">
-                    <h1 className="font-serif-display italic text-[26px] leading-[1.12] text-[#A90F4D] font-medium">
-                      Pequenos detalhes,
-                      <br />
-                      grandes <span className="font-script text-[36px] not-italic">momentos.</span>
-                    </h1>
-
-                    {/* Ornamento de linha com coração idêntico à referência */}
-                    <div className="flex items-center gap-1.5 my-2 text-[#A90F4D]">
-                      <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#A90F4D]/60 to-[#A90F4D]" />
-                      <Heart className="w-3.5 h-3.5 fill-none stroke-[#A90F4D] stroke-[2]" />
-                      <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#A90F4D]/60 to-[#A90F4D]" />
-                    </div>
-
-                    <p className="text-[12.5px] leading-snug text-[#4A2532] font-medium mb-3.5">
-                      Presentes, aromas e sabores para tornar a vida mais especial.
-                    </p>
-
-                    <button
-                      onClick={() => {
-                        catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="px-4 py-2.5 rounded-full bg-gradient-to-r from-[#A90F4D] to-[#C4185C] text-white text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all inline-flex items-center gap-1.5"
-                    >
-                      <span>Conheça nossos produtos</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Imagem das Rosas de Chá sobre tábua de madeira fiel à foto */}
-                  <div className="col-span-5 relative">
-                    <div
-                      onClick={() => openProductModal(products[1] || products[0])}
-                      className="cursor-pointer relative rounded-2xl overflow-hidden shadow-lg border-2 border-white/70 aspect-square group"
-                    >
-                      <img
-                        src={
-                          heroSlide === 0
-                            ? 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85'
-                            : heroSlide === 1
-                            ? 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=85'
-                            : 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=900&q=85'
-                        }
-                        alt="Cápsulas de Chá Rosa Mimo Rosas"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#A90F4D]/25 via-transparent to-transparent" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Indicadores do Carrossel do Banner */}
-                <div className="flex items-center justify-center gap-1.5 mt-3">
-                  {[0, 1, 2].map((idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setHeroSlide(idx)}
-                      aria-label={`Slide ${idx + 1}`}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        heroSlide === idx ? 'bg-[#A90F4D] scale-110' : 'bg-[#FFF9F3]/80'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              {/* 3. FAIXA DE CATEGORIAS COM ROLAGEM HORIZONTAL E SETA LATERAL */}
-              <section className="relative -mt-7 z-20 px-3">
-                <div className="relative flex items-center">
-                  <div
-                    ref={categoryScrollRef}
-                    className="flex items-stretch gap-2 overflow-x-auto no-scrollbar py-1 pr-8"
-                  >
-                    {categories.map((cat) => {
-                      const isSelected = selectedCategory === cat.id;
-                      return (
-                        <button
-                          key={cat.id}
-                          onClick={() =>
-                            setSelectedCategory((prev) => (prev === cat.id ? 'all' : cat.id))
-                          }
-                          className={`w-[88px] shrink-0 rounded-2xl p-2.5 flex flex-col items-center justify-start text-center border transition-all shadow-xs ${
-                            isSelected
-                              ? 'bg-[#FFF9F3] border-[#A90F4D] ring-2 ring-[#A90F4D]/25 -translate-y-0.5'
-                              : 'bg-[#F6E9E5]/95 border-[#EAD6D0] hover:bg-[#FFF9F3]'
-                          }`}
-                        >
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-1">
-                            <CategoryIllustration type={cat.icon} />
-                          </div>
-                          <span className="text-[10.5px] leading-[1.18] font-medium text-[#4A2532] line-clamp-3">
-                            {cat.shortName}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Botão redondo de seta à direita idêntico à referência */}
-                  <button
-                    onClick={() => {
-                      if (categoryScrollRef.current) {
-                        categoryScrollRef.current.scrollBy({ left: 180, behavior: 'smooth' });
-                      }
-                    }}
-                    aria-label="Rolar categorias"
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#FFF9F3] text-[#A90F4D] shadow-md border border-[#EAD6D0] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-                  >
-                    <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-                  </button>
-                </div>
-              </section>
-
-              {/* 4. SEÇÃO "NOSSOS DESTAQUES" FIEL À REFERÊNCIA */}
-              <section ref={catalogSectionRef} className="px-3.5 pt-5 pb-3">
-                <div className="flex items-center justify-center gap-3 mb-3.5">
-                  <div className="h-[1px] flex-1 bg-[#D9B8B0]" />
-                  <h2 className="text-center flex items-baseline gap-1.5">
-                    <span className="font-serif-display text-[22px] font-semibold text-[#4A2532]">
-                      {selectedCategory === 'all' && !searchQuery
-                        ? 'Nossos'
-                        : 'Catálogo'}
-                    </span>
-                    <span className="font-script text-[36px] text-[#A90F4D] leading-none">
-                      {selectedCategory === 'all' && !searchQuery
-                        ? 'Destaques'
-                        : 'Mimo Rosas'}
-                    </span>
-                  </h2>
-                  <div className="h-[1px] flex-1 bg-[#D9B8B0]" />
-                </div>
-
-                {/* Filtro ativo caso o cliente tenha clicado em uma categoria */}
-                {(selectedCategory !== 'all' || searchQuery) && (
-                  <div className="flex items-center justify-between bg-[#F6E9E5] px-3 py-1.5 rounded-full mb-3 text-xs">
-                    <span className="text-[#795344] truncate">
-                      Filtro:{' '}
-                      <strong className="text-[#A90F4D]">
-                        {selectedCategory !== 'all'
-                          ? categories.find((c) => c.id === selectedCategory)?.name
-                          : `"${searchQuery}"`}
-                      </strong>
-                    </span>
-                    <button
-                      onClick={() => {
-                        setSelectedCategory('all');
-                        setSearchQuery('');
-                      }}
-                      className="text-[#A90F4D] font-bold ml-2 shrink-0"
-                    >
-                      Ver todos
-                    </button>
-                  </div>
-                )}
-
-                {/* GRID EM DUAS COLUNAS FIEL À IMAGEM */}
-                <div className="grid grid-cols-2 gap-3">
-                  {(selectedCategory === 'all' && !searchQuery
-                    ? featuredProducts
-                    : filteredProducts
-                  ).map((product) => {
-                    const isFav = favorites.includes(product.id);
-                    return (
-                      <div
-                        key={product.id}
-                        onClick={() => openProductModal(product)}
-                        className="bg-[#F6E9E5]/85 rounded-2xl overflow-hidden border border-[#EAD6D0] shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer group"
-                      >
-                        <div className="relative aspect-[1.08/1] overflow-hidden bg-[#EAD6D0]">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-
-                          {/* Selo superior esquerdo ("Mais Vendido" ou "Novo") */}
-                          {product.badge && (
-                            <div className="absolute top-2 left-2 bg-[#FFF9F3]/95 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold text-[#4A2532] flex items-center gap-1 shadow-xs">
-                              {product.badgeType === 'star' ? (
-                                <Star className="w-3 h-3 text-[#A90F4D]" />
-                              ) : (
-                                <Sparkles className="w-3 h-3 text-[#A90F4D]" />
-                              )}
-                              <span>{product.badge}</span>
-                            </div>
-                          )}
-
-                          {/* Botão de Favoritar no Card */}
-                          <button
-                            onClick={(e) => toggleFavorite(product.id, e)}
-                            aria-label="Favoritar"
-                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#FFF9F3]/90 text-[#A90F4D] flex items-center justify-center shadow-xs hover:scale-110 transition-transform"
-                          >
-                            <Heart
-                              className={`w-3.5 h-3.5 ${
-                                isFav ? 'fill-[#A90F4D]' : 'fill-none'
-                              }`}
-                            />
-                          </button>
-                        </div>
-
-                        <div className="p-2.5 flex-1 flex flex-col justify-between text-center">
-                          <div>
-                            <h3 className="text-[12.5px] leading-snug font-medium text-[#4A2532] line-clamp-2 min-h-[34px]">
-                              {product.name}
-                            </h3>
-                            <p className="text-[16px] font-bold text-[#A90F4D] mt-1 mb-2">
-                              {formatBRL(product.price)}
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={(e) => addToCart(product, 1, null, e)}
-                            className="w-full py-2 px-2 rounded-full bg-gradient-to-r from-[#A90F4D] to-[#B81456] hover:from-[#8E0B3F] hover:to-[#A90F4D] text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all"
-                          >
-                            <ShoppingCart className="w-3.5 h-3.5" />
-                            <span>Adicionar ao carrinho</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* 5. BANNER INSTITUCIONAL "ARTESANAL, COM MUITO AMOR" FIEL À REFERÊNCIA */}
-              <section className="px-3.5 py-2">
-                <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-[#990B43] via-[#A90F4D] to-[#C82564] text-[#FFF9F3] p-4 shadow-md border border-[#D46A92]/30">
-                  <div className="flex items-center gap-3 relative z-10">
-                    <div className="shrink-0">
-                      <RoseLogoSVG className="w-14 h-16" strokeColor="#FFF9F3" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="font-serif-display text-[17px] leading-tight font-medium">
-                          Artesanal,{' '}
-                          <span className="italic font-normal">com muito</span>{' '}
-                          <span className="font-script text-[25px] leading-none">amor</span>
-                        </h3>
-                        <Heart className="w-4 h-4 text-[#F6E9E5] shrink-0" />
-                      </div>
-                      <div className="h-[1px] w-36 bg-[#F6E9E5]/40 my-1" />
-                      <p className="text-[11px] text-[#F6E9E5]/95 leading-snug">
-                        Cuidados em cada detalhe para encantar em cada escolha.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-2.5 flex justify-end relative z-10">
-                    <button
-                      onClick={() => setAboutModalOpen(true)}
-                      className="px-3.5 py-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D] text-[11px] font-semibold inline-flex items-center gap-1 shadow-xs hover:bg-white transition-colors"
-                    >
-                      <span>Sobre a Mimo Rosas</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* CATÁLOGO COMPLETO DE TODAS AS 8 CATEGORIAS LOGO ABAIXO */}
-              <section className="px-3.5 pt-4 pb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                    Explore Todo o Nosso Catálogo ({filteredProducts.length})
-                  </h3>
-                  <button
-                    onClick={() => setActiveTab('categories')}
-                    className="text-xs font-semibold text-[#A90F4D] flex items-center gap-0.5"
-                  >
-                    <span>Ver categorias</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {filteredProducts.map((product) => {
-                    const isFav = favorites.includes(product.id);
-                    return (
-                      <div
-                        key={product.id}
-                        onClick={() => openProductModal(product)}
-                        className="bg-[#F6E9E5]/85 rounded-2xl overflow-hidden border border-[#EAD6D0] shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer group"
-                      >
-                        <div className="relative aspect-[1.08/1] overflow-hidden bg-[#EAD6D0]">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          {product.badge && (
-                            <div className="absolute top-2 left-2 bg-[#FFF9F3]/95 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-[#4A2532] flex items-center gap-1 shadow-xs">
-                              <Sparkles className="w-2.5 h-2.5 text-[#A90F4D]" />
-                              <span>{product.badge}</span>
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => toggleFavorite(product.id, e)}
-                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#FFF9F3]/90 text-[#A90F4D] flex items-center justify-center shadow-xs"
-                          >
-                            <Heart
-                              className={`w-3.5 h-3.5 ${
-                                isFav ? 'fill-[#A90F4D]' : 'fill-none'
-                              }`}
-                            />
-                          </button>
-                        </div>
-
-                        <div className="p-2.5 flex-1 flex flex-col justify-between text-center">
-                          <div>
-                            <h4 className="text-[12px] leading-snug font-medium text-[#4A2532] line-clamp-2 min-h-[32px]">
-                              {product.name}
-                            </h4>
-                            <p className="text-[15px] font-bold text-[#A90F4D] mt-1 mb-2">
-                              {formatBRL(product.price)}
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => addToCart(product, 1, null, e)}
-                            className="w-full py-2 px-2 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                          >
-                            <ShoppingCart className="w-3.5 h-3.5" />
-                            <span>Adicionar ao carrinho</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </main>
-          )}
-
-          {/* ABA CATEGORIAS */}
-          {activeTab === 'categories' && (
-            <div className="p-4 space-y-4">
-              <div className="text-center">
-                <h2 className="font-serif-display text-2xl font-bold text-[#4A2532]">
-                  Nossas Categorias Artesanais
-                </h2>
-                <p className="text-xs text-[#795344]">
-                  Toque em uma categoria para filtrar os produtos da Mimo Rosas
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {categories.map((cat) => {
-                  const count = activeProducts.filter((p) => p.category === cat.id).length;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setActiveTab('home');
-                      }}
-                      className="bg-[#F6E9E5] hover:bg-[#FFF9F3] border border-[#EAD6D0] hover:border-[#A90F4D] rounded-2xl p-4 flex flex-col items-center text-center gap-2 transition-all shadow-xs"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-[#FFF9F3] flex items-center justify-center shadow-xs">
-                        <CategoryIllustration type={cat.icon} />
-                      </div>
-                      <span className="font-serif-display font-bold text-sm text-[#4A2532] leading-snug">
-                        {cat.name}
-                      </span>
-                      <span className="text-[10px] font-semibold text-[#A90F4D] bg-[#FFF9F3] px-2.5 py-0.5 rounded-full">
-                        {count} produtos
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ABA FAVORITOS */}
-          {activeTab === 'favorites' && (
-            <div className="p-4 space-y-4">
-              <div className="text-center">
-                <h2 className="font-serif-display text-2xl font-bold text-[#4A2532]">
-                  Meus Favoritos 🌹
-                </h2>
-                <p className="text-xs text-[#795344]">
-                  Seus mimos preferidos salvos para comprar quando quiser
-                </p>
-              </div>
-
-              {favoriteProducts.length === 0 ? (
-                <div className="bg-[#F6E9E5]/60 rounded-3xl p-8 text-center space-y-3 border border-[#EAD6D0]">
-                  <Heart className="w-10 h-10 text-[#A90F4D] mx-auto stroke-[1.5]" />
-                  <p className="text-sm font-medium text-[#4A2532]">
-                    Sua lista de favoritos ainda está vazia.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('home')}
-                    className="px-5 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
-                  >
-                    Explorar Produtos
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {favoriteProducts.map((product) => (
-                    <div
-                      key={product.id}
-                      onClick={() => openProductModal(product)}
-                      className="bg-[#F6E9E5] rounded-2xl overflow-hidden border border-[#EAD6D0] flex flex-col cursor-pointer"
-                    >
-                      <div className="relative aspect-square">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          onClick={(e) => toggleFavorite(product.id, e)}
-                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#FFF9F3] text-[#A90F4D] flex items-center justify-center"
-                        >
-                          <Heart className="w-3.5 h-3.5 fill-[#A90F4D]" />
-                        </button>
-                      </div>
-                      <div className="p-2.5 text-center flex-1 flex flex-col justify-between">
-                        <h3 className="text-xs font-medium text-[#4A2532] line-clamp-2">
-                          {product.name}
-                        </h3>
-                        <p className="text-sm font-bold text-[#A90F4D] my-1">
-                          {formatBRL(product.price)}
-                        </p>
-                        <button
-                          onClick={(e) => addToCart(product, 1, null, e)}
-                          className="w-full py-1.5 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold"
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ABA MINHA CONTA & MEUS PEDIDOS */}
-          {activeTab === 'account' && (
-            <div className="p-4 space-y-4">
-              <div className="bg-[#F6E9E5] rounded-3xl p-4 border border-[#EAD6D0] flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]">
-                    <User className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase tracking-wider font-semibold text-[#A90F4D] bg-[#FFF9F3] px-2 py-0.5 rounded-full">
-                      Cliente & Admin
-                    </span>
-                    <h2 className="font-serif-display text-lg text-[#4A2532] font-semibold mt-0.5">
-                      Minha Conta Mimo Rosas
-                    </h2>
-                    <p className="text-xs text-[#795344]">
-                      Pedidos sincronizados em tempo real
-                    </p>
-                  </div>
-                </div>
                 <button
-                  onClick={handleRequestAdminAccess}
-                  className="px-3.5 py-2 rounded-full bg-[#A90F4D] text-white text-xs font-semibold shadow-xs shrink-0"
-                >
-                  Abrir Painel Admin
-                </button>
-              </div>
-
-              <div className="space-y-2.5">
-                <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                  Histórico de Pedidos ({orders.length})
-                </h3>
-                {orders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="bg-[#FFF9F3] rounded-2xl p-3.5 border border-[#EAD6D0] space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-[#A90F4D]">
-                        {ord.id}
-                      </span>
-                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]">
-                        {ord.status}
-                      </span>
-                    </div>
-                    <p className="text-xs font-medium text-[#4A2532]">
-                      Cliente: {ord.customerName} • Total:{' '}
-                      <strong className="text-[#A90F4D]">{formatBRL(ord.total)}</strong>
-                    </p>
-                    <p className="text-[11px] text-[#795344]">
-                      {ord.items.map((i) => `${i.qty}x ${i.name}`).join(', ')}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 6. BOTÃO FLUTUANTE "VAMOS CONVERSAR?" FIEL À REFERÊNCIA */}
-          <button
-            onClick={() => setAssistantOpen(true)}
-            className="fixed bottom-[70px] right-3 sm:right-[calc(50%-228px)] z-30 bg-[#FFF9F3] hover:bg-white text-[#2B2B2B] pl-2 pr-3.5 py-1.5 rounded-full shadow-lg border border-[#E5CFC9] flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-          >
-            <span className="w-7 h-7 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-xs">
-              <WhatsAppIcon className="w-4 h-4" />
-            </span>
-            <span className="text-xs font-bold tracking-tight">Vamos conversar?</span>
-            <span className="w-2 h-2 rounded-full bg-[#25D366]" />
-          </button>
-
-          {/* 7. MENU INFERIOR FIXO COM 5 ABAS FIEL À IMAGEM DE REFERÊNCIA */}
-          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-30 bg-[#F6E9E5]/95 backdrop-blur-md border-t border-[#E6CFC8] grid grid-cols-5 py-1.5 px-1">
-            {[
-              { id: 'home', label: 'Início', icon: Home },
-              { id: 'categories', label: 'Categorias', icon: LayoutGrid },
-              { id: 'favorites', label: 'Favoritos', icon: Heart, badge: favorites.length },
-              { id: 'account', label: 'Minha Conta', icon: User },
-              { id: 'support', label: 'Atendimento', icon: 'whatsapp' }
-            ].map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.id === 'support') {
-                      setAssistantOpen(true);
-                    } else {
-                      setActiveTab(item.id);
-                    }
-                  }}
-                  className={`relative flex flex-col items-center justify-center py-1 transition-colors ${
-                    isActive ? 'text-[#A90F4D] font-bold' : 'text-[#795344] hover:text-[#A90F4D]'
+                  type="button"
+                  onClick={() => setIsCartOpen(true)}
+                  aria-label="Abrir carrinho"
+                  className={`relative p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition ${
+                    cartBounce ? 'scale-125' : ''
                   }`}
                 >
-                  {item.icon === 'whatsapp' ? (
-                    <WhatsAppIcon className="w-5 h-5" />
-                  ) : (
-                    <item.icon
-                      className={`w-5 h-5 ${
-                        isActive && item.id === 'home' ? 'fill-[#A90F4D]' : ''
-                      }`}
-                    />
-                  )}
-                  <span className="text-[10.5px] mt-0.5">{item.label}</span>
-                  {isActive && (
-                    <span className="absolute -bottom-1.5 w-10 h-[3px] rounded-full bg-[#A90F4D]" />
-                  )}
+                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
+                  <span className="absolute top-0.5 right-0.5 min-w-[19px] h-[19px] px-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
+                    {cartCount}
+                  </span>
                 </button>
-              );
-            })}
-          </nav>
+              </div>
+            </div>
 
-          {/* =================================================================
-              MODAIS INTERATIVOS: MENU LATERAL, PÁGINA DE PRODUTO, CARRINHO, CHECKOUT E ASSISTENTE
-          ================================================================= */}
-
-          {/* MENU LATERAL QUE ABRE E FECHA */}
-          {sideMenuOpen && (
-            <div className="fixed inset-0 z-50 flex">
-              <div
-                onClick={() => setSideMenuOpen(false)}
-                className="fixed inset-0 bg-[#3B1924]/60 backdrop-blur-xs"
-              />
-              <div className="relative w-76 max-w-[82vw] bg-[#FFF9F3] h-full z-10 p-5 flex flex-col justify-between overflow-y-auto shadow-2xl">
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between pb-3 border-b border-[#EFE0DC]">
-                    <div className="flex items-center gap-2">
-                      <RoseLogoSVG className="w-8 h-9" />
-                      <span className="font-script text-3xl text-[#A90F4D]">Mimo Rosas</span>
-                    </div>
+            {isSearchOpen && (
+              <div className="mt-2.5 pb-1 animate-fadeIn">
+                <div className="relative flex items-center">
+                  <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (activeView !== 'catalog' && activeView !== 'home') {
+                        setActiveView('catalog');
+                      }
+                    }}
+                    placeholder="Buscar infusões, cápsulas de rosa, cuias..."
+                    className="w-full pl-10 pr-9 py-2.5 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]"
+                    autoFocus
+                  />
+                  {searchQuery && (
                     <button
-                      onClick={() => setSideMenuOpen(false)}
-                      className="p-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]"
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 text-[#795344] hover:text-[#A90F4D]"
                     >
                       <X className="w-4 h-4" />
                     </button>
-                  </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </header>
 
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#795344] mb-2">
-                      Gestão & Loja
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSideMenuOpen(false);
-                        handleRequestAdminAccess();
+          {/* CONTEÚDO PRINCIPAL DA VITRINE */}
+          <main className="flex-1">
+            {activeView === 'home' && (
+              <div>
+                {/* 2. BANNER PRINCIPAL FIEL À IMAGEM */}
+                <section className="relative w-full overflow-hidden bg-[#F2D7D3]">
+                  <div className="relative min-h-[290px] sm:min-h-[340px] w-full flex items-center">
+                    <img
+                      src={HERO_SLIDES[heroIndex].image}
+                      alt="Banner Mimo Rosas"
+                      className="absolute inset-0 w-full h-full object-cover object-right transition-all duration-700"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background:
+                          'linear-gradient(90deg, rgba(246,226,223,0.98) 0%, rgba(246,226,223,0.92) 48%, rgba(246,226,223,0.25) 78%, rgba(246,226,223,0.05) 100%)'
                       }}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#A90F4D] hover:bg-[#8E0B3F]"
-                    >
-                      <span>⚙️ Acessar Painel Admin (Sistema)</span>
-                      <ChevronRight className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
+                    />
 
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#795344] mb-2">
-                      Categorias Mimo Rosas
-                    </p>
-                    <div className="space-y-1">
-                      {categories.map((cat) => (
+                    <div className="relative z-10 w-[68%] sm:w-[60%] pl-4 sm:pl-8 py-6">
+                      <h1 className="font-serif-display italic text-[25px] sm:text-[34px] text-[#A90F4D] leading-[1.15]">
+                        {HERO_SLIDES[heroIndex].titleLine1}
+                        <br />
+                        <span>{HERO_SLIDES[heroIndex].titleLine2} </span>
+                        <span className="font-script not-italic text-[37px] sm:text-[48px] leading-none">
+                          {HERO_SLIDES[heroIndex].titleScript}
+                        </span>
+                      </h1>
+
+                      <div className="-ml-2 my-1">
+                        <HeartFlourishSVG className="w-52 sm:w-64 h-7" />
+                      </div>
+
+                      <p className="text-[12.5px] sm:text-[14px] text-[#4E2F26] leading-snug max-w-[240px] sm:max-w-[300px] font-normal">
+                        {HERO_SLIDES[heroIndex].subtitle}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = HERO_SLIDES[heroIndex].targetCategory;
+                          if (target === 'all') {
+                            catalogSectionRef.current?.scrollIntoView({
+                              behavior: 'smooth'
+                            });
+                          } else {
+                            navigateCategory(target);
+                          }
+                        }}
+                        className="mt-4 inline-flex items-center gap-2 bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[13px] sm:text-[14px] font-medium px-5 py-2.5 rounded-full shadow-[0_6px_16px_rgba(169,15,77,0.32)] active:scale-95 transition-all"
+                      >
+                        <span>{HERO_SLIDES[heroIndex].cta}</span>
+                        <span className="text-base leading-none">→</span>
+                      </button>
+                    </div>
+
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+                      {HERO_SLIDES.map((slide, idx) => (
                         <button
-                          key={cat.id}
-                          onClick={() => {
-                            setSelectedCategory(cat.id);
-                            setActiveTab('home');
-                            setSideMenuOpen(false);
-                          }}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-[#4A2532] hover:bg-[#F6E9E5]"
-                        >
-                          <span className="text-left">{cat.name}</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-[#A90F4D] shrink-0" />
-                        </button>
+                          key={slide.id}
+                          type="button"
+                          onClick={() => setHeroIndex(idx)}
+                          aria-label={`Slide ${idx + 1}`}
+                          className={`rounded-full transition-all ${
+                            heroIndex === idx
+                              ? 'w-2.5 h-2.5 bg-[#A90F4D]'
+                              : 'w-2 h-2 bg-[#FFF9F3]/80'
+                          }`}
+                        />
                       ))}
                     </div>
                   </div>
-                </div>
+                </section>
 
-                <div className="pt-4 border-t border-[#EFE0DC] text-center">
-                  <p className="text-[11px] text-[#795344]">
-                    Mimo Rosas • Artesanal com muito amor 🌹
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* PÁGINA INDIVIDUAL DO PRODUTO (MODAL DETALHADO) */}
-          {selectedProduct && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/70 backdrop-blur-xs flex items-end sm:items-center justify-center">
-              <div className="bg-[#FFF9F3] w-full max-w-[480px] rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto shadow-2xl border border-[#EAD6D0]">
-                <div className="relative aspect-square bg-[#F6E9E5]">
-                  <img
-                    src={
-                      selectedProduct.gallery?.[activeGalleryIdx] || selectedProduct.image
-                    }
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    onClick={() => setSelectedProduct(null)}
-                    className="absolute top-3 right-3 w-9 h-9 rounded-full bg-[#FFF9F3]/90 text-[#4A2532] flex items-center justify-center shadow-md"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                  {selectedProduct.badge && (
-                    <span className="absolute top-3 left-3 bg-[#FFF9F3]/95 px-3 py-1 rounded-full text-xs font-semibold text-[#A90F4D] shadow-xs">
-                      {selectedProduct.badge}
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-serif-display text-2xl font-bold text-[#4A2532] leading-tight">
-                      {selectedProduct.name}
-                    </h2>
-                    <button
-                      onClick={(e) => toggleFavorite(selectedProduct.id, e)}
-                      className="p-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] shrink-0"
+                {/* 3. CATEGORIAS COM ROLAGEM HORIZONTAL */}
+                <section className="relative px-3.5 pt-4 pb-2">
+                  <div className="relative">
+                    <div
+                      ref={categoryScrollRef}
+                      className="flex items-stretch gap-2.5 overflow-x-auto no-scrollbar pr-8 py-1"
                     >
-                      <Heart
-                        className={`w-5 h-5 ${
-                          favorites.includes(selectedProduct.id) ? 'fill-[#A90F4D]' : ''
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-2xl font-bold text-[#A90F4D]">
-                      {formatBRL(selectedProduct.price)}
-                    </span>
-                    <span className="text-xs text-[#795344]">
-                      Em estoque ({selectedProduct.stock} disponíveis)
-                    </span>
-                  </div>
-
-                  <p className="text-xs leading-relaxed text-[#795344]">
-                    {selectedProduct.description}
-                  </p>
-
-                  {/* Seleção de Variações */}
-                  {selectedProduct.variations && selectedProduct.variations.length > 0 && (
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-semibold text-[#4A2532]">
-                        Escolha sua opção / aroma:
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProduct.variations.map((v) => (
+                      {categories.map((cat) => {
+                        const isSelected = selectedCategory === cat.id;
+                        return (
                           <button
-                            key={v}
+                            key={cat.id}
                             type="button"
-                            onClick={() => setSelectedVariation(v)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                              selectedVariation === v
-                                ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                                : 'bg-[#F6E9E5] text-[#4A2532] border-[#E5CFC9]'
+                            onClick={() => {
+                              setSelectedCategory(
+                                selectedCategory === cat.id ? 'all' : cat.id
+                              );
+                            }}
+                            className={`flex-shrink-0 w-[96px] sm:w-[116px] rounded-[20px] p-2.5 flex flex-col items-center justify-start text-center transition-all duration-200 border ${
+                              isSelected
+                                ? 'bg-[#FFF9F3] border-[#A90F4D] shadow-md -translate-y-0.5'
+                                : 'bg-[#F9ECE8] hover:bg-[#FFF9F3] border-[#F0DCD6] shadow-[0_4px_12px_rgba(121,83,68,0.06)]'
                             }`}
                           >
-                            {v}
+                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-1">
+                              <CategoryIconSVG type={cat.iconType} />
+                            </div>
+                            <span className="text-[11px] sm:text-[12px] font-medium text-[#4E2F26] leading-[1.2] line-clamp-3">
+                              {cat.shortName}
+                            </span>
                           </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quantidade + Botão Adicionar ao Carrinho */}
-                  <div className="flex items-center gap-3 pt-2">
-                    <div className="flex items-center bg-[#F6E9E5] rounded-full border border-[#E5CFC9] px-2 py-1">
-                      <button
-                        type="button"
-                        onClick={() => setProductQty((q) => Math.max(1, q - 1))}
-                        className="p-1.5 text-[#A90F4D]"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="px-3 text-sm font-bold">{productQty}</span>
-                      <button
-                        type="button"
-                        onClick={() => setProductQty((q) => q + 1)}
-                        className="p-1.5 text-[#A90F4D]"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+                        );
+                      })}
                     </div>
 
                     <button
                       type="button"
-                      onClick={() => {
-                        addToCart(selectedProduct, productQty, selectedVariation);
-                        setSelectedProduct(null);
-                        setCartOpen(true);
-                      }}
-                      className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-[#A90F4D] to-[#C2185B] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md"
+                      onClick={scrollCategoriesRight}
+                      aria-label="Rolar categorias"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#FFF9F3] border border-[#EBD5CF] shadow-md flex items-center justify-center text-[#A90F4D] hover:scale-105 active:scale-95 transition"
                     >
-                      <ShoppingCart className="w-4 h-4" />
-                      <span>
-                        Adicionar • {formatBRL(selectedProduct.price * productQty)}
-                      </span>
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
+                </section>
 
-          {/* DRAWER DO CARRINHO DE COMPRAS */}
-          {cartOpen && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/70 backdrop-blur-xs flex justify-end">
-              <div className="bg-[#FFF9F3] w-full max-w-[430px] h-full flex flex-col justify-between p-5 shadow-2xl">
-                <div className="flex items-center justify-between pb-3 border-b border-[#EFE0DC]">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5 text-[#A90F4D]" />
-                    <h3 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                      Seu Carrinho ({cartCount})
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setCartOpen(false)}
-                    className="p-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {cart.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-[#F6E9E5] flex items-center justify-center text-[#A90F4D]">
-                      <ShoppingCart className="w-7 h-7" />
-                    </div>
-                    <h4 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                      Seu carrinho está vazio
-                    </h4>
-                    <p className="text-xs text-[#795344]">
-                      Adicione infusões, cápsulas de chá de rosa ou cuias artesanais para começar!
-                    </p>
-                    <button
-                      onClick={() => setCartOpen(false)}
-                      className="px-5 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
-                    >
-                      Escolher Produtos
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex-1 overflow-y-auto py-4 space-y-3">
-                      {cart.map((item) => (
-                        <div
-                          key={item.cartKey}
-                          className="bg-[#F6E9E5]/70 rounded-2xl p-3 border border-[#EAD6D0] flex gap-3 items-center"
-                        >
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-16 h-16 rounded-xl object-cover shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-semibold text-[#4A2532] truncate">
-                              {item.name}
-                            </h4>
-                            <p className="text-[11px] text-[#795344]">{item.variation}</p>
-                            <p className="text-xs font-bold text-[#A90F4D] mt-0.5">
-                              {formatBRL(item.price * item.qty)}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5">
-                            <button
-                              onClick={() => removeFromCart(item.cartKey)}
-                              className="text-[#795344] hover:text-red-600"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="flex items-center bg-[#FFF9F3] rounded-full border border-[#E5CFC9] px-1.5 py-0.5">
-                              <button
-                                onClick={() => updateCartQty(item.cartKey, -1)}
-                                className="p-1 text-[#A90F4D]"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="px-2 text-xs font-bold">{item.qty}</span>
-                              <button
-                                onClick={() => updateCartQty(item.cartKey, 1)}
-                                className="p-1 text-[#A90F4D]"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="pt-3 border-t border-[#EFE0DC] space-y-3">
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between text-[#795344]">
-                          <span>Subtotal</span>
-                          <span>{formatBRL(cartSubtotal)}</span>
-                        </div>
-                        <div className="flex justify-between text-[#795344]">
-                          <span>Entrega estimada</span>
-                          <span>
-                            {shippingCost === 0 ? 'Grátis 🌹' : formatBRL(shippingCost)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-base font-bold text-[#4A2532] pt-1">
-                          <span>Total</span>
-                          <span className="text-[#A90F4D]">{formatBRL(cartTotal)}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setCartOpen(false);
-                          setCheckoutSuccess(null);
-                          setCheckoutOpen(true);
-                        }}
-                        className="w-full py-3 rounded-full bg-gradient-to-r from-[#A90F4D] to-[#C2185B] text-white text-xs font-bold shadow-md"
-                      >
-                        Finalizar Pedido (Checkout) →
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* MODAL DE CHECKOUT DEMONSTRATIVO */}
-          {checkoutOpen && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/70 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-[#FFF9F3] w-full max-w-[460px] rounded-3xl p-5 max-h-[92vh] overflow-y-auto shadow-2xl border border-[#EAD6D0]">
-                <div className="flex items-center justify-between pb-3 border-b border-[#EFE0DC]">
-                  <h3 className="font-serif-display text-xl font-bold text-[#4A2532]">
-                    {checkoutSuccess ? 'Pedido Confirmado! 🌹' : 'Finalizar Compra • Mimo Rosas'}
-                  </h3>
-                  <button
-                    onClick={() => setCheckoutOpen(false)}
-                    className="p-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {checkoutSuccess ? (
-                  <div className="py-5 text-center space-y-4">
-                    <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                      <Check className="w-7 h-7" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-mono font-bold text-[#A90F4D] bg-[#F6E9E5] px-3 py-1 rounded-full">
-                        Pedido {checkoutSuccess.id}
+                {/* 4. SEÇÃO "NOSSOS DESTAQUES" */}
+                <section ref={catalogSectionRef} className="px-3.5 pt-4 pb-4">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
+                    <h2 className="text-center flex items-baseline gap-2">
+                      <span className="font-serif-display text-[22px] sm:text-[26px] text-[#4E2F26] font-normal">
+                        Nossos
                       </span>
-                      <h4 className="font-serif-display text-2xl font-bold text-[#4A2532] mt-2">
-                        Muito obrigada, {checkoutSuccess.customerName}!
-                      </h4>
-                      <p className="text-xs text-[#795344] mt-1">
-                        Seu pedido demonstrativo foi registrado com sucesso e já aparece no Painel Admin e no banco do Supabase.
-                      </p>
-                    </div>
-
-                    <div className="bg-[#F6E9E5] rounded-2xl p-3.5 text-left text-xs space-y-1">
-                      <p>
-                        <strong>Total:</strong> {formatBRL(checkoutSuccess.total)} (
-                        {checkoutSuccess.paymentMethod.toUpperCase()})
-                      </p>
-                      <p>
-                        <strong>Modalidade:</strong>{' '}
-                        {checkoutSuccess.deliveryMethod === 'pickup'
-                          ? 'Retirada no Ateliê'
-                          : checkoutSuccess.address}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-2 pt-2">
-                      <button
-                        onClick={() => {
-                          setCheckoutOpen(false);
-                          setAdminTab('orders');
-                          handleRequestAdminAccess();
-                        }}
-                        className="w-full py-3 rounded-full bg-[#A90F4D] text-white text-xs font-semibold shadow-sm"
-                      >
-                        Ver este Pedido no Painel Admin →
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCheckoutOpen(false);
-                          setActiveTab('home');
-                        }}
-                        className="w-full py-2.5 rounded-full bg-[#F6E9E5] text-[#4A2532] text-xs font-semibold"
-                      >
-                        Voltar para a Loja
-                      </button>
-                    </div>
+                      <span className="font-script text-[40px] sm:text-[46px] text-[#A90F4D] leading-none">
+                        Destaques
+                      </span>
+                    </h2>
+                    <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
                   </div>
-                ) : (
-                  <form onSubmit={handleCheckoutSubmit} className="space-y-3.5 mt-3 text-xs">
-                    {checkoutError && (
-                      <div className="p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 font-medium">
-                        {checkoutError}
-                      </div>
-                    )}
 
-                    <div>
-                      <label className="block font-semibold mb-1">Nome completo</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ex: Ana Clara"
-                        value={checkoutForm.name}
-                        onChange={(e) =>
-                          setCheckoutForm({ ...checkoutForm, name: e.target.value })
-                        }
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold mb-1">Telefone / WhatsApp</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="(54) 99999-9999"
-                        value={checkoutForm.phone}
-                        onChange={(e) =>
-                          setCheckoutForm({ ...checkoutForm, phone: e.target.value })
-                        }
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                      />
-                    </div>
-
-                    {/* Escolha Entrega ou Retirada */}
-                    <div className="grid grid-cols-2 gap-2">
+                  {(selectedCategory !== 'all' || searchQuery.trim() !== '') && (
+                    <div className="mb-3 flex items-center justify-between bg-[#FFF9F3] px-3.5 py-2 rounded-full border border-[#EBD5CF] text-xs">
+                      <span className="text-[#5A382E] font-medium truncate">
+                        Filtro:{' '}
+                        <strong className="text-[#A90F4D]">
+                          {selectedCategory === 'all'
+                            ? `"${searchQuery}"`
+                            : categories.find((c) => c.id === selectedCategory)?.name}
+                        </strong>
+                      </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          setCheckoutForm({ ...checkoutForm, deliveryMethod: 'delivery' })
-                        }
-                        className={`p-3 rounded-2xl border flex items-center gap-2 font-semibold ${
-                          checkoutForm.deliveryMethod === 'delivery'
-                            ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                            : 'bg-[#F6E9E5] text-[#4A2532] border-[#E5CFC9]'
-                        }`}
+                        onClick={() => {
+                          setSelectedCategory('all');
+                          setSearchQuery('');
+                        }}
+                        className="text-[#A90F4D] font-semibold hover:underline ml-2 shrink-0"
                       >
-                        <Truck className="w-4 h-4" />
-                        <span>Entrega</span>
+                        Ver todos
                       </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    {(selectedCategory === 'all' && !searchQuery
+                      ? featuredProducts
+                      : filteredProducts
+                    ).map((product) => renderProductCard(product))}
+                  </div>
+
+                  {selectedCategory === 'all' && !searchQuery && (
+                    <div className="mt-5 text-center">
                       <button
                         type="button"
-                        onClick={() =>
-                          setCheckoutForm({ ...checkoutForm, deliveryMethod: 'pickup' })
-                        }
-                        className={`p-3 rounded-2xl border flex items-center gap-2 font-semibold ${
-                          checkoutForm.deliveryMethod === 'pickup'
-                            ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                            : 'bg-[#F6E9E5] text-[#4A2532] border-[#E5CFC9]'
-                        }`}
+                        onClick={() => setActiveView('catalog')}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FFF9F3] border border-[#D9B2BE] text-[#A90F4D] text-xs sm:text-sm font-semibold shadow-xs hover:bg-[#A90F4D] hover:text-white transition-colors"
                       >
-                        <Store className="w-4 h-4" />
-                        <span>Retirada (Grátis)</span>
+                        <span>Ver todos os {visibleProducts.length} produtos da loja</span>
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
+                  )}
+                </section>
 
-                    {checkoutForm.deliveryMethod === 'delivery' && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="col-span-1">
-                          <label className="block font-semibold mb-1">CEP</label>
-                          <input
-                            type="text"
-                            placeholder="00000-000"
-                            value={checkoutForm.cep}
-                            onChange={(e) =>
-                              setCheckoutForm({ ...checkoutForm, cep: e.target.value })
-                            }
-                            className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block font-semibold mb-1">Endereço completo</label>
-                          <input
-                            type="text"
-                            placeholder="Rua, número, bairro e cidade"
-                            value={checkoutForm.address}
-                            onChange={(e) =>
-                              setCheckoutForm({ ...checkoutForm, address: e.target.value })
-                            }
-                            className="w-full px-3 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Forma de Pagamento Ilustrativa */}
-                    <div>
-                      <label className="block font-semibold mb-1.5">
-                        Forma de Pagamento (Demonstração)
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCheckoutForm({ ...checkoutForm, paymentMethod: 'pix' })
-                          }
-                          className={`p-3 rounded-2xl border flex items-center gap-2 font-semibold ${
-                            checkoutForm.paymentMethod === 'pix'
-                              ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                              : 'bg-[#F6E9E5] text-[#4A2532] border-[#E5CFC9]'
-                          }`}
-                        >
-                          <QrCode className="w-4 h-4" />
-                          <span>PIX Instantâneo</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCheckoutForm({ ...checkoutForm, paymentMethod: 'card' })
-                          }
-                          className={`p-3 rounded-2xl border flex items-center gap-2 font-semibold ${
-                            checkoutForm.paymentMethod === 'card'
-                              ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
-                              : 'bg-[#F6E9E5] text-[#4A2532] border-[#E5CFC9]'
-                          }`}
-                        >
-                          <CreditCard className="w-4 h-4" />
-                          <span>Cartão de Crédito</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#F6E9E5] rounded-2xl p-3 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Itens ({cartCount})</span>
-                        <span>{formatBRL(cartSubtotal)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Frete</span>
-                        <span>{shippingCost === 0 ? 'Grátis' : formatBRL(shippingCost)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold text-[#A90F4D] pt-1 border-t border-[#E5CFC9]">
-                        <span>Total do Pedido</span>
-                        <span>{formatBRL(cartTotal)}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-3 rounded-full bg-gradient-to-r from-[#A90F4D] to-[#C2185B] text-white font-bold shadow-md"
-                    >
-                      Confirmar Pedido Demonstrativo
-                    </button>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* JANELA DA ASSISTENTE VIRTUAL MIMO ROSAS */}
-          {assistantOpen && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <div className="bg-[#FFF9F3] w-full max-w-[430px] h-[84vh] sm:h-[600px] sm:rounded-3xl rounded-t-3xl flex flex-col justify-between overflow-hidden shadow-2xl border border-[#EAD6D0]">
-                {/* Topo da Assistente */}
-                <div className="bg-gradient-to-r from-[#A90F4D] to-[#C2185B] text-white p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-full bg-[#FFF9F3] flex items-center justify-center">
-                      <RoseLogoSVG className="w-7 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif-display text-lg font-bold leading-none">
-                        Assistente Mimo Rosas 🌹
-                      </h3>
-                      <span className="text-[11px] text-[#F6E9E5] flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />
-                        Online agora • Atendimento demonstrativo
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setAssistantOpen(false)}
-                    className="p-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white"
+                {/* 5. BANNER INSTITUCIONAL "ARTESANAL, COM MUITO AMOR" */}
+                <section className="px-3.5 pt-1 pb-4">
+                  <div
+                    className="relative rounded-[26px] overflow-hidden p-4 sm:p-6 text-[#FFF9F3] shadow-[0_10px_28px_rgba(169,15,77,0.25)]"
+                    style={{
+                      background:
+                        'linear-gradient(100deg, #980B44 0%, #A90F4D 58%, #C43B6E 100%)'
+                    }}
                   >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                    <div className="relative z-10 flex items-center gap-3.5 sm:gap-6">
+                      <div className="shrink-0">
+                        <MimoRoseOutlineSVG
+                          className="w-16 h-20 sm:w-20 sm:h-24"
+                          strokeColor="#FFF9F3"
+                        />
+                      </div>
 
-                {/* Mensagens */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FFF9F3]">
-                  {chatMessages.map((msg) => {
-                    const recProd = msg.recommendedProductId
-                      ? products.find((p) => p.id === msg.recommendedProductId)
-                      : null;
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col ${
-                          msg.sender === 'user' ? 'items-end' : 'items-start'
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                            msg.sender === 'user'
-                              ? 'bg-[#A90F4D] text-white rounded-br-xs'
-                              : 'bg-[#F6E9E5] text-[#4A2532] border border-[#EAD6D0] rounded-bl-xs'
-                          }`}
-                        >
-                          {msg.text}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-serif-display text-[17px] sm:text-[22px] leading-tight">
+                            Artesanal,{' '}
+                            <span className="italic font-normal">com muito</span>{' '}
+                            <span className="font-script text-[29px] sm:text-[36px] leading-none">
+                              amor
+                            </span>
+                          </h3>
+                          <Heart className="w-4 h-4 text-[#FAD4E0] inline shrink-0" />
                         </div>
 
-                        {recProd && (
-                          <div
-                            onClick={() => {
-                              setAssistantOpen(false);
-                              openProductModal(recProd);
-                            }}
-                            className="mt-2 w-64 bg-white rounded-2xl p-2.5 border border-[#EAD6D0] shadow-xs flex items-center gap-2.5 cursor-pointer hover:border-[#A90F4D]"
+                        <div className="w-44 h-[1px] bg-[#F6B8CC]/60 my-1.5" />
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-1">
+                          <p className="text-[11.5px] sm:text-[13px] text-[#FCEEF2] leading-snug max-w-[210px]">
+                            Cuidados em cada detalhe para encantar em cada escolha.
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsAboutModalOpen(true)}
+                            className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 bg-[#FCE5EC] hover:bg-white text-[#A90F4D] text-[11.5px] sm:text-[12.5px] font-semibold px-3.5 py-2 rounded-full shadow-sm active:scale-95 transition"
                           >
-                            <img
-                              src={recProd.image}
-                              alt={recProd.name}
-                              className="w-12 h-12 rounded-xl object-cover shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold text-[#4A2532] truncate">
-                                {recProd.name}
-                              </p>
-                              <p className="text-xs font-bold text-[#A90F4D]">
-                                {formatBRL(recProd.price)}
-                              </p>
-                              <span className="text-[10px] text-[#795344] underline">
-                                Ver detalhes →
-                              </span>
+                            <span>Sobre a Mimo Rosas</span>
+                            <span>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* VIEW: CATÁLOGO COMPLETO */}
+            {activeView === 'catalog' && (
+              <div className="px-3.5 py-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveView('home')}
+                      className="inline-flex items-center gap-1 text-xs text-[#A90F4D] font-semibold mb-1"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Voltar ao Início</span>
+                    </button>
+                    <h1 className="font-serif-display text-2xl text-[#4E2F26] font-semibold">
+                      {selectedCategory === 'all'
+                        ? 'Catálogo Completo'
+                        : categories.find((c) => c.id === selectedCategory)?.name}
+                    </h1>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-[#FFF9F3] px-3 py-1.5 rounded-full border border-[#EBD5CF] text-xs">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-[#A90F4D]" />
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="bg-transparent text-[#4E2F26] font-medium focus:outline-none"
+                    >
+                      <option value="featured">Destaques</option>
+                      <option value="price-asc">Menor Preço</option>
+                      <option value="price-desc">Maior Preço</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${
+                      selectedCategory === 'all'
+                        ? 'bg-[#A90F4D] text-white'
+                        : 'bg-[#FFF9F3] text-[#5A382E] border border-[#EBD5CF]'
+                    }`}
+                  >
+                    Todos ({visibleProducts.length})
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${
+                        selectedCategory === cat.id
+                          ? 'bg-[#A90F4D] text-white'
+                          : 'bg-[#FFF9F3] text-[#5A382E] border border-[#EBD5CF]'
+                      }`}
+                    >
+                      {cat.shortName}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+                  {filteredProducts.map((product) => renderProductCard(product))}
+                </div>
+              </div>
+            )}
+
+            {/* VIEW: PÁGINA INDIVIDUAL DO PRODUTO */}
+            {activeView === 'product' && selectedProduct && (
+              <div className="px-3.5 py-4 space-y-5">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('home')}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#A90F4D] bg-[#FFF9F3] px-3.5 py-2 rounded-full border border-[#EBD5CF]"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Voltar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => toggleFavorite(selectedProduct.id, e)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#A90F4D] bg-[#FFF9F3] px-3.5 py-2 rounded-full border border-[#EBD5CF]"
+                  >
+                    <Heart
+                      className="w-4 h-4"
+                      fill={favorites.includes(selectedProduct.id) ? '#A90F4D' : 'none'}
+                    />
+                    <span>
+                      {favorites.includes(selectedProduct.id) ? 'Salvo' : 'Favoritar'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="bg-[#FFF9F3] rounded-[28px] p-4 sm:p-6 border border-[#EBD5CF] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2.5">
+                    <div className="aspect-square rounded-[22px] overflow-hidden bg-[#F6E9E5] relative">
+                      <img
+                        src={
+                          selectedProduct.gallery?.[activeGalleryIdx] ||
+                          selectedProduct.image
+                        }
+                        alt={selectedProduct.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {selectedProduct.gallery && selectedProduct.gallery.length > 1 && (
+                      <div className="flex gap-2">
+                        {selectedProduct.gallery.map((imgUrl, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setActiveGalleryIdx(i)}
+                            className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition ${
+                              activeGalleryIdx === i
+                                ? 'border-[#A90F4D]'
+                                : 'border-transparent opacity-70'
+                            }`}
+                          >
+                            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col justify-between space-y-4">
+                    <div className="space-y-2.5">
+                      <span className="text-[11px] uppercase tracking-wider font-semibold text-[#A90F4D]">
+                        {categories.find((c) => c.id === selectedProduct.category)?.name}
+                      </span>
+
+                      <h1 className="font-serif-display text-2xl sm:text-3xl text-[#4A2532] font-semibold leading-tight">
+                        {selectedProduct.name}
+                      </h1>
+
+                      <p className="text-3xl font-bold text-[#A90F4D] pt-1">
+                        {formatBRL(selectedProduct.price)}
+                      </p>
+
+                      <p className="text-xs sm:text-sm text-[#6D493B] leading-relaxed pt-1">
+                        {selectedProduct.description}
+                      </p>
+
+                      {selectedProduct.variations &&
+                        selectedProduct.variations.length > 0 && (
+                          <div className="pt-2">
+                            <label className="block text-xs font-semibold text-[#4A2532] mb-2">
+                              Escolha a opção:
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedProduct.variations.map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => setSelectedVariation(v)}
+                                  className={`px-3.5 py-2 rounded-full text-xs font-medium border transition ${
+                                    selectedVariation === v
+                                      ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
+                                      : 'bg-[#F6E9E5] text-[#5A382E] border-[#E2C7C0]'
+                                  }`}
+                                >
+                                  {v}
+                                </button>
+                              ))}
                             </div>
                           </div>
                         )}
-                      </div>
-                    );
-                  })}
+                    </div>
 
-                  {/* 5 Botões Interativos Obrigatórios */}
-                  <div className="pt-1">
-                    <p className="text-[10.5px] font-semibold text-[#795344] mb-1.5">
-                      Toque em uma opção rápida:
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { id: 'conhecer', label: '🌹 Conhecer produtos' },
-                        { id: 'precos', label: '💰 Consultar preços' },
-                        { id: 'presentes', label: '🎁 Encontrar presentes' },
-                        { id: 'duvidas', label: '✨ Tirar dúvidas' },
-                        { id: 'pedidos', label: '📦 Ajuda com pedidos' }
-                      ].map((opt) => (
+                    <div className="pt-3 space-y-3 border-t border-[#F0DCD6]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[#4A2532]">
+                          Quantidade:
+                        </span>
+                        <div className="flex items-center gap-3 bg-[#F6E9E5] px-3 py-1.5 rounded-full border border-[#E2C7C0]">
+                          <button
+                            type="button"
+                            onClick={() => setProductQty((q) => Math.max(1, q - 1))}
+                            className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-sm font-bold w-5 text-center">
+                            {productQty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setProductQty((q) => q + 1)}
+                            className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2.5">
                         <button
-                          key={opt.id}
-                          onClick={() => handleAssistantOption(opt.id)}
-                          className="px-3 py-1.5 rounded-full bg-[#F6E9E5] hover:bg-[#A90F4D] hover:text-white text-[#A90F4D] border border-[#E5CFC9] text-[11px] font-semibold transition-colors"
+                          type="button"
+                          onClick={() =>
+                            addToCart(selectedProduct, productQty, selectedVariation)
+                          }
+                          className="flex-1 py-3.5 px-5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
                         >
-                          {opt.label}
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>
+                            Adicionar • {formatBRL(selectedProduct.price * productQty)}
+                          </span>
                         </button>
-                      ))}
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW: FAVORITOS */}
+            {activeView === 'favorites' && (
+              <div className="px-3.5 py-4 space-y-4">
+                <h1 className="font-serif-display text-2xl text-[#4E2F26] font-semibold">
+                  Meus Favoritos ({favorites.length})
+                </h1>
+                {favorites.length === 0 ? (
+                  <div className="bg-[#FFF9F3] rounded-3xl p-8 text-center border border-[#EBD5CF]">
+                    <Heart className="w-10 h-10 text-[#A90F4D] mx-auto mb-2 opacity-60" />
+                    <p className="text-sm text-[#795344]">
+                      Sua lista de desejos ainda está vazia.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+                    {visibleProducts
+                      .filter((p) => favorites.includes(p.id))
+                      .map((product) => renderProductCard(product))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VIEW: MINHA CONTA */}
+            {activeView === 'account' && (
+              <div className="px-3.5 py-4 space-y-4">
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-14 h-14 rounded-full bg-[#F6E9E5] border border-[#E2B8C4] flex items-center justify-center text-[#A90F4D]">
+                      <User className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h1 className="font-serif-display text-xl font-bold text-[#4A2532]">
+                        Espaço Cliente Mimo Rosas
+                      </h1>
+                      <p className="text-xs text-[#795344]">
+                        Acompanhe seus pedidos e favoritos
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setAppMode('admin')}
+                    className="px-3.5 py-2 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Abrir Painel Admin</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW: CHECKOUT */}
+            {activeView === 'checkout' && (
+              <div className="px-3.5 py-4 space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveView('home')}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#A90F4D]"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Continuar comprando</span>
+                </button>
+
+                <h1 className="font-serif-display text-2xl text-[#4A2532] font-bold">
+                  Finalizar Pedido
+                </h1>
+
+                {orderSuccess ? (
+                  <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EBD5CF] text-center space-y-4 shadow-sm">
+                    <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                      <Check className="w-8 h-8 stroke-[2.5]" />
+                    </div>
+                    <h2 className="font-serif-display text-2xl text-[#4A2532] font-bold">
+                      Pedido Registrado com Carinho! 🌹
+                    </h2>
+                    <p className="text-xs text-[#795344] max-w-md mx-auto">
+                      Obrigada, <strong>{orderSuccess.customer}</strong>! Seu pedido{' '}
+                      <strong className="text-[#A90F4D]">{orderSuccess.code}</strong> já foi salvo no Painel Administrativo e no banco Supabase.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderSuccess(null);
+                          setActiveView('home');
+                        }}
+                        className="px-6 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
+                      >
+                        Voltar para a Vitrine
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderSuccess(null);
+                          setAppMode('admin');
+                          setAdminTab('orders');
+                        }}
+                        className="px-6 py-2.5 rounded-full bg-[#FFF9F3] border border-[#A90F4D] text-[#A90F4D] text-xs font-semibold"
+                      >
+                        Ver Pedido no Painel Admin →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
+                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">
+                        1. Seus Dados
+                      </h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          required
+                          value={checkoutData.name}
+                          onChange={(e) =>
+                            setCheckoutData({ ...checkoutData, name: e.target.value })
+                          }
+                          placeholder="Seu nome completo *"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                        />
+                        <input
+                          type="tel"
+                          required
+                          value={checkoutData.phone}
+                          onChange={(e) =>
+                            setCheckoutData({ ...checkoutData, phone: e.target.value })
+                          }
+                          placeholder="WhatsApp (DDD) 99999-9999 *"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
+                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">
+                        2. Entrega ou Retirada
+                      </h2>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCheckoutData({
+                              ...checkoutData,
+                              deliveryMethod: 'delivery'
+                            })
+                          }
+                          className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 ${
+                            checkoutData.deliveryMethod === 'delivery'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2]'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5]'
+                          }`}
+                        >
+                          <Truck className="w-5 h-5 text-[#A90F4D]" />
+                          <div>
+                            <p className="text-xs font-bold text-[#4A2532]">Entrega</p>
+                            <p className="text-[10px] text-[#795344]">Correios / Motoboy</p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCheckoutData({ ...checkoutData, deliveryMethod: 'pickup' })
+                          }
+                          className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 ${
+                            checkoutData.deliveryMethod === 'pickup'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2]'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5]'
+                          }`}
+                        >
+                          <Store className="w-5 h-5 text-[#A90F4D]" />
+                          <div>
+                            <p className="text-xs font-bold text-[#4A2532]">Retirada</p>
+                            <p className="text-[10px] text-emerald-700 font-semibold">
+                              Grátis no Ateliê
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+
+                      {checkoutData.deliveryMethod === 'delivery' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+                          <input
+                            type="text"
+                            required
+                            value={checkoutData.cep}
+                            onChange={(e) =>
+                              setCheckoutData({ ...checkoutData, cep: e.target.value })
+                            }
+                            placeholder="CEP *"
+                            className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                          />
+                          <input
+                            type="text"
+                            required
+                            value={checkoutData.address}
+                            onChange={(e) =>
+                              setCheckoutData({
+                                ...checkoutData,
+                                address: e.target.value
+                              })
+                            }
+                            placeholder="Rua / Avenida e Número *"
+                            className="sm:col-span-2 px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
+                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">
+                        3. Pagamento e Resumo ({formatBRL(cartTotal)})
+                      </h2>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCheckoutData({ ...checkoutData, paymentMethod: 'pix' })
+                          }
+                          className={`p-3 rounded-2xl border flex items-center gap-2 ${
+                            checkoutData.paymentMethod === 'pix'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2]'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5]'
+                          }`}
+                        >
+                          <QrCode className="w-5 h-5 text-[#A90F4D]" />
+                          <span className="text-xs font-bold">PIX Instantâneo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCheckoutData({ ...checkoutData, paymentMethod: 'card' })
+                          }
+                          className={`p-3 rounded-2xl border flex items-center gap-2 ${
+                            checkoutData.paymentMethod === 'card'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2]'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5]'
+                          }`}
+                        >
+                          <CreditCard className="w-5 h-5 text-[#A90F4D]" />
+                          <span className="text-xs font-bold">Cartão de Crédito</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm shadow-lg"
+                      >
+                        Confirmar Pedido • {formatBRL(cartTotal)}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* 6. BOTÃO FLUTUANTE DE ATENDIMENTO "VAMOS CONVERSAR?" */}
+          <button
+            type="button"
+            onClick={() => setIsAssistantOpen(true)}
+            className="fixed bottom-[76px] right-3 sm:right-6 z-30 bg-[#FFF9F3] hover:bg-white text-[#3B231C] pl-2 pr-4 py-2 rounded-full shadow-[0_8px_24px_rgba(89,40,58,0.22)] border border-[#EBD5CF] flex items-center gap-2 active:scale-95 transition-all"
+          >
+            <span className="relative w-8 h-8 rounded-full bg-[#38C958] flex items-center justify-center text-white shadow-xs">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.05 20.16C10.57 20.16 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.98 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.16 12.05 20.16Z" />
+              </svg>
+            </span>
+            <span className="text-[12.5px] font-semibold tracking-tight">
+              Vamos conversar?
+            </span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#38C958]" />
+          </button>
+
+          {/* 7. MENU INFERIOR FIXO NO CELULAR */}
+          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] md:max-w-[960px] z-30 bg-[#FFF9F3] border-t border-[#EAD6D0] px-2 pt-1.5 pb-2 shadow-[0_-4px_20px_rgba(121,83,68,0.08)]">
+            <div className="grid grid-cols-5 items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveView('home');
+                  setSelectedCategory('all');
+                }}
+                className={`flex flex-col items-center gap-0.5 py-1 relative ${
+                  activeView === 'home' ? 'text-[#A90F4D]' : 'text-[#795344]'
+                }`}
+              >
+                <Home className="w-5 h-5" />
+                <span className="text-[11px] font-medium">Início</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveView('catalog')}
+                className={`flex flex-col items-center gap-0.5 py-1 relative ${
+                  activeView === 'catalog' ? 'text-[#A90F4D]' : 'text-[#795344]'
+                }`}
+              >
+                <LayoutGrid className="w-5 h-5" />
+                <span className="text-[11px] font-medium">Categorias</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveView('favorites')}
+                className={`flex flex-col items-center gap-0.5 py-1 relative ${
+                  activeView === 'favorites' ? 'text-[#A90F4D]' : 'text-[#795344]'
+                }`}
+              >
+                <Heart className="w-5 h-5" />
+                <span className="text-[11px] font-medium">Favoritos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveView('account')}
+                className={`flex flex-col items-center gap-0.5 py-1 relative ${
+                  activeView === 'account' ? 'text-[#A90F4D]' : 'text-[#795344]'
+                }`}
+              >
+                <User className="w-5 h-5" />
+                <span className="text-[11px] font-medium">Minha Conta</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAssistantOpen(true)}
+                className="flex flex-col items-center gap-0.5 py-1 text-[#795344]"
+              >
+                <Sparkles className="w-5 h-5 text-[#A90F4D]" />
+                <span className="text-[11px] font-medium">Atendimento</span>
+              </button>
+            </div>
+          </nav>
+
+          {/* MENU LATERAL */}
+          {isSideMenuOpen && (
+            <div className="fixed inset-0 z-50 flex">
+              <div
+                className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+                onClick={() => setIsSideMenuOpen(false)}
+              />
+              <aside className="relative z-10 w-[82%] max-w-[330px] bg-[#FFF9F3] h-full shadow-2xl flex flex-col justify-between p-5 overflow-y-auto">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between border-b border-[#EFE0DC] pb-3">
+                    <div className="flex items-center gap-2">
+                      <MimoRoseOutlineSVG className="w-8 h-9" />
+                      <span className="font-script text-3xl text-[#A90F4D]">
+                        Mimo Rosas
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsSideMenuOpen(false)}
+                      className="p-1.5 rounded-full text-[#795344]"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-wider text-[#9A7468] font-semibold px-2 mb-1.5">
+                      Categorias da Loja
+                    </p>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => navigateCategory(cat.id)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-medium text-[#4E2F26] hover:bg-[#F6E9E5]"
+                      >
+                        <span>{cat.name}</span>
+                        <ChevronRight className="w-4 h-4 text-[#A90F4D]" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-[#EFE0DC]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideMenuOpen(false);
+                      setAppMode('admin');
+                    }}
+                    className="w-full py-2.5 rounded-full bg-[#3A1C28] text-white text-xs font-semibold flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Acessar Painel Admin</span>
+                  </button>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {/* GAVETA DO CARRINHO */}
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end">
+              <div
+                className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+                onClick={() => setIsCartOpen(false)}
+              />
+              <aside className="relative z-10 w-full max-w-[390px] bg-[#FFF9F3] h-full shadow-2xl flex flex-col justify-between">
+                <div className="p-4 border-b border-[#EFE0DC] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-[#A90F4D]" />
+                    <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                      Sua Sacola ({cartCount})
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCartOpen(false)}
+                    className="p-1.5 rounded-full text-[#795344]"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {cart.length === 0 ? (
+                    <div className="text-center py-14 space-y-3">
+                      <ShoppingCart className="w-10 h-10 text-[#A90F4D] mx-auto opacity-50" />
+                      <p className="text-xs text-[#795344]">Sua sacola está vazia.</p>
+                    </div>
+                  ) : (
+                    cart.map((item) => (
+                      <div
+                        key={item.cartKey}
+                        className="flex gap-3 bg-[#F6E9E5]/60 p-2.5 rounded-2xl border border-[#EFE0DC]"
+                      >
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-16 h-16 rounded-xl object-cover shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-semibold text-[#4A2532] line-clamp-1">
+                            {item.name}
+                          </h4>
+                          <p className="text-[11px] text-[#795344]">{item.variation}</p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs font-bold text-[#A90F4D]">
+                              {formatBRL(item.price * item.quantity)}
+                            </span>
+                            <div className="flex items-center gap-2 bg-[#FFF9F3] px-2 py-0.5 rounded-full border border-[#E5CFC9]">
+                              <button
+                                type="button"
+                                onClick={() => updateCartQty(item.cartKey, -1)}
+                              >
+                                <Minus className="w-3 h-3 text-[#A90F4D]" />
+                              </button>
+                              <span className="text-xs font-semibold">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateCartQty(item.cartKey, 1)}
+                              >
+                                <Plus className="w-3 h-3 text-[#A90F4D]" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.cartKey)}
+                          className="text-[#9A7468] hover:text-red-600 self-start"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="p-4 bg-[#F6E9E5] border-t border-[#E5CFC9] space-y-3">
+                    <div className="flex justify-between text-sm font-bold text-[#4A2532]">
+                      <span>Subtotal</span>
+                      <span className="text-[#A90F4D]">{formatBRL(cartSubtotal)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCartOpen(false);
+                        setOrderSuccess(null);
+                        setActiveView('checkout');
+                      }}
+                      className="w-full py-3.5 rounded-full bg-[#A90F4D] text-white font-semibold text-sm shadow-md"
+                    >
+                      Finalizar Compra →
+                    </button>
+                  </div>
+                )}
+              </aside>
+            </div>
+          )}
+
+          {/* ASSISTENTE VIRTUAL MIMO ROSAS */}
+          {isAssistantOpen && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <div
+                className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+                onClick={() => setIsAssistantOpen(false)}
+              />
+              <div className="relative z-10 w-full max-w-[430px] h-[84vh] sm:h-[620px] bg-[#FFF9F3] rounded-t-[28px] sm:rounded-[28px] shadow-2xl flex flex-col overflow-hidden border border-[#EBD5CF]">
+                <div
+                  className="p-4 text-white flex items-center justify-between"
+                  style={{
+                    background: 'linear-gradient(90deg, #980B44 0%, #A90F4D 100%)'
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#FFF9F3] flex items-center justify-center">
+                      <MimoRoseOutlineSVG className="w-6 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif-display font-bold text-base leading-tight">
+                        Assistente Mimo Rosas
+                      </h3>
+                      <p className="text-[11px] text-[#FAD4E0]">
+                        Atendimento Virtual Online
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAssistantOpen(false)}
+                    className="p-1.5 rounded-full bg-white/15 text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F6E9E5]/60">
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${
+                        msg.sender === 'user' ? 'items-end' : 'items-start'
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-xs ${
+                          msg.sender === 'user'
+                            ? 'bg-[#A90F4D] text-white rounded-br-xs'
+                            : 'bg-[#FFF9F3] text-[#4A2532] border border-[#EBD5CF] rounded-bl-xs'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+
+                      {msg.products && msg.products.length > 0 && (
+                        <div className="mt-2 grid grid-cols-2 gap-2 w-full max-w-[90%]">
+                          {msg.products.map((p) => (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                setIsAssistantOpen(false);
+                                openProductDetail(p);
+                              }}
+                              className="bg-[#FFF9F3] p-2 rounded-xl border border-[#EBD5CF] cursor-pointer hover:border-[#A90F4D] transition"
+                            >
+                              <img
+                                src={p.image}
+                                alt={p.name}
+                                className="w-full h-20 object-cover rounded-lg mb-1"
+                              />
+                              <p className="text-[11px] font-semibold text-[#4A2532] line-clamp-1">
+                                {p.name}
+                              </p>
+                              <p className="text-xs font-bold text-[#A90F4D]">
+                                {formatBRL(p.price)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* Campo de digitação */}
+                <div className="px-3 py-2 bg-[#FFF9F3] border-t border-[#EFE0DC] flex gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'produtos', label: '🌹 Conhecer produtos' },
+                    { id: 'precos', label: '💰 Consultar preços' },
+                    { id: 'presentes', label: '🎁 Encontrar presentes' },
+                    { id: 'duvidas', label: '✨ Tirar dúvidas' },
+                    { id: 'pedidos', label: '🛍️ Ajuda com pedidos' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleAssistantOption(opt.id)}
+                      className="px-3 py-1.5 rounded-full bg-[#F6E9E5] hover:bg-[#A90F4D] hover:text-white text-[#A90F4D] text-[11px] font-semibold shrink-0 border border-[#E5CFC9] transition"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
                 <form
-                  onSubmit={handleCustomChatSubmit}
-                  className="p-3 bg-[#F6E9E5] border-t border-[#EAD6D0] flex items-center gap-2"
+                  onSubmit={handleChatSubmit}
+                  className="p-3 bg-[#FFF9F3] border-t border-[#EFE0DC] flex items-center gap-2"
                 >
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Escreva sua mensagem para a Mimo Rosas..."
-                    className="flex-1 px-3.5 py-2 rounded-full bg-[#FFF9F3] border border-[#E5CFC9] text-xs focus:outline-none focus:border-[#A90F4D]"
+                    placeholder="Digite sua dúvida para a Mimo Rosas..."
+                    className="flex-1 px-3.5 py-2.5 rounded-full bg-[#F6E9E5] border border-[#E5CFC9] text-xs focus:outline-none"
                   />
                   <button
                     type="submit"
@@ -3647,88 +4380,28 @@ export default function App() {
           )}
 
           {/* MODAL SOBRE A MIMO ROSAS */}
-          {aboutModalOpen && (
-            <div className="fixed inset-0 z-50 bg-[#3B1924]/70 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-[#FFF9F3] max-w-sm w-full rounded-3xl p-6 text-center border border-[#EAD6D0] shadow-2xl space-y-3">
-                <RoseLogoSVG className="w-12 h-14 mx-auto" />
+          {isAboutModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+                onClick={() => setIsAboutModalOpen(false)}
+              />
+              <div className="relative z-10 bg-[#FFF9F3] max-w-md w-full rounded-[28px] p-6 border border-[#EBD5CF] shadow-2xl text-center space-y-3">
+                <MimoRoseOutlineSVG className="w-12 h-14 mx-auto" />
                 <h3 className="font-script text-4xl text-[#A90F4D]">Mimo Rosas</h3>
-                <p className="text-xs text-[#795344] leading-relaxed">
-                  Nascemos da paixão por transformar rituais diários — como o chimarrão, o chá da tarde e o café — em momentos poéticos, perfumados e cheios de afeto. Cada cápsula de rosa, blend e cuia resinada é produzido artesanalmente.
+                <p className="text-xs sm:text-sm text-[#5A382E] leading-relaxed">
+                  Nascemos da paixão por transformar rituais diários — como o chimarrão, o chá da tarde e o café — em momentos de afeto e beleza.
                 </p>
                 <button
-                  onClick={() => setAboutModalOpen(false)}
-                  className="mt-4 w-full py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
+                  type="button"
+                  onClick={() => setIsAboutModalOpen(false)}
+                  className="mt-2 px-6 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
                 >
-                  Voltar para a Loja
+                  Continuar navegando
                 </button>
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* =====================================================================
-          MODAL DE SENHA DO PAINEL ADMIN (Para segurança quando publicado na Vercel)
-      ===================================================================== */}
-      {showAdminLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3B1924]/70 backdrop-blur-xs p-4">
-          <div className="w-full max-w-[380px] bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#EFE0DC]">
-              <div className="flex items-center gap-2">
-                <RoseLogoSVG className="w-8 h-9" />
-                <div>
-                  <h3 className="font-serif-display text-base font-bold text-[#4A2532]">
-                    Acesso Restrito • Admin
-                  </h3>
-                  <p className="text-[11px] text-[#795344]">Gestão da Loja Mimo Rosas</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAdminLoginModal(false)}
-                className="p-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAdminLoginSubmit} className="mt-4 space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-[#4A2532] mb-1">
-                  Digite a senha do Painel Admin:
-                </label>
-                <input
-                  type="password"
-                  autoFocus
-                  value={adminPassInput}
-                  onChange={(e) => setAdminPassInput(e.target.value)}
-                  placeholder="Senha padrão: mimo2026"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] focus:outline-none focus:border-[#A90F4D]"
-                />
-                {adminPassError && (
-                  <p className="text-[11px] text-red-600 font-medium mt-1">{adminPassError}</p>
-                )}
-                <p className="text-[10.5px] text-[#795344] mt-1.5">
-                  💡 Senha inicial padrão: <strong>mimo2026</strong> (você pode alterá-la dentro do painel).
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAdminLoginModal(false)}
-                  className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#4A2532] font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-full bg-[#A90F4D] text-white font-semibold shadow-sm"
-                >
-                  Entrar no Painel
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
     </div>
