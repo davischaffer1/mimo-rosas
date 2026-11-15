@@ -1504,27 +1504,65 @@ export default function App() {
     if (!supabaseUrl || !supabaseKey) return;
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-      await fetch(`${cleanUrl}/rest/v1/products`, {
+
+      // 1. Garante que a categoria existe para não dar erro 400 de Foreign Key
+      const catObj = categories.find((c) => c.id === prod.category);
+      if (catObj) {
+        await fetch(`${cleanUrl}/rest/v1/categories?on_conflict=id`, {
+          method: 'POST',
+          headers: sbHeaders('resolution=merge-duplicates,return=minimal'),
+          body: JSON.stringify({
+            id: catObj.id,
+            name: catObj.name,
+            short_name: catObj.shortName,
+            icon_type: catObj.iconType,
+            description: catObj.description || ''
+          })
+        });
+      }
+
+      const payload = {
+        id: String(prod.id),
+        name: prod.name,
+        category: prod.category,
+        price: Number(prod.price) || 0,
+        stock: Math.round(Number(prod.stock) || 0),
+        badge: prod.badge || null,
+        badge_type: prod.badgeType || 'star',
+        featured: Boolean(prod.featured),
+        active: prod.active !== false,
+        rating: Number(prod.rating || 5),
+        reviews: Math.round(Number(prod.reviews || 10)),
+        image: prod.image,
+        gallery: Array.isArray(prod.gallery) ? prod.gallery : [prod.image],
+        variations: Array.isArray(prod.variations) ? prod.variations : ['Padrão'],
+        description: prod.description || ''
+      };
+
+      // 2. Faz UPSERT explícito com ?on_conflict=id
+      const res = await fetch(`${cleanUrl}/rest/v1/products?on_conflict=id`, {
         method: 'POST',
-        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
-        body: JSON.stringify({
-          id: prod.id,
-          name: prod.name,
-          category: prod.category,
-          price: Number(prod.price),
-          stock: Number(prod.stock),
-          badge: prod.badge || null,
-          badge_type: prod.badgeType || 'star',
-          featured: Boolean(prod.featured),
-          active: prod.active !== false,
-          rating: Number(prod.rating || 5),
-          reviews: Number(prod.reviews || 10),
-          image: prod.image,
-          gallery: prod.gallery || [prod.image],
-          variations: prod.variations || ['Padrão'],
-          description: prod.description || ''
-        })
+        headers: sbHeaders('resolution=merge-duplicates,return=minimal'),
+        body: JSON.stringify(payload)
       });
+
+      // 3. Fallback caso a tabela do Supabase tenha menos colunas
+      if (!res.ok) {
+        await fetch(
+          `${cleanUrl}/rest/v1/products?id=eq.${encodeURIComponent(prod.id)}`,
+          {
+            method: 'PATCH',
+            headers: sbHeaders('return=minimal'),
+            body: JSON.stringify({
+              name: payload.name,
+              price: payload.price,
+              stock: payload.stock,
+              image: payload.image,
+              description: payload.description
+            })
+          }
+        );
+      }
     } catch {
       // fallback local
     }
