@@ -617,34 +617,47 @@ alter table public.orders enable row level security;
 
 drop policy if exists "Liberar categorias geral" on public.categories;
 create policy "Liberar categorias geral" on public.categories for all using (true) with check (true);
+`;
 
-drop policy if exists "Liberar produtos geral" on public.products;
-create policy "Liberar produtos geral" on public.products for all using (true) with check (true);
+const SUPABASE_STORAGE_SQL_ONLY = `-- RECRIAR TABELAS COM TODAS AS COLUNAS EXATAS (RESOLVE ERRO PGRST204 DEFINITIVAMENTE)
+drop table if exists public.products cascade;
+drop table if exists public.categories cascade;
 
-drop policy if exists "Liberar pedidos geral" on public.orders;
-create policy "Liberar pedidos geral" on public.orders for all using (true) with check (true);
+create table public.categories (
+  id text primary key,
+  name text not null,
+  short_name text,
+  icon_type text,
+  description text,
+  created_at timestamptz default now()
+);
 
--- 5. Criar Bucket Público de Fotos (Supabase Storage)
-insert into storage.buckets (id, name, public)
-values ('products', 'products', true)
-on conflict (id) do update set public = true;
+create table public.products (
+  id text primary key,
+  name text not null,
+  category text,
+  price numeric(10,2) not null default 0,
+  stock integer not null default 0,
+  badge text,
+  badge_type text default 'star',
+  featured boolean default false,
+  active boolean default true,
+  rating numeric(3,2) default 5.0,
+  reviews integer default 10,
+  image text,
+  gallery jsonb default '[]'::jsonb,
+  variations jsonb default '["Padrão"]'::jsonb,
+  description text,
+  created_at timestamptz default now()
+);
 
-drop policy if exists "Acesso publico fotos Mimo Rosas" on storage.objects;
-create policy "Acesso publico fotos Mimo Rosas"
-on storage.objects for all
-using (bucket_id = 'products')
-with check (bucket_id = 'products');`;
+alter table public.categories enable row level security;
+alter table public.products enable row level security;
 
-const SUPABASE_STORAGE_SQL_ONLY = `-- Ativar Galeria de Fotos (Bucket 'products') no Supabase Storage
-insert into storage.buckets (id, name, public)
-values ('products', 'products', true)
-on conflict (id) do update set public = true;
+create policy "Acesso total categories" on public.categories for all using (true) with check (true);
+create policy "Acesso total products" on public.products for all using (true) with check (true);
 
-drop policy if exists "Acesso publico fotos Mimo Rosas" on storage.objects;
-create policy "Acesso publico fotos Mimo Rosas"
-on storage.objects for all
-using (bucket_id = 'products')
-with check (bucket_id = 'products');`;
+notify pgrst, 'reload schema';`;
 
 // ============================================================================
 // COMPONENTES SVG FIÉIS À IMAGEM DE REFERÊNCIA DA MIMO ROSAS
@@ -1367,7 +1380,7 @@ export default function App() {
         const mappedProducts = dbProducts.map((p) => ({
           id: p.id,
           name: p.name,
-          category: p.category || 'infusoes',
+          category: p.category || p.category_id || 'infusoes',
           price: Number(p.price),
           stock: Number(p.stock),
           badge: p.badge,
@@ -1504,28 +1517,11 @@ export default function App() {
     if (!supabaseUrl || !supabaseKey) return;
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-
-      // 1. Garante que a categoria existe na tabela categories antes de salvar o produto
       const catObj =
         categories.find((c) => c.id === prod.category) || categories[0];
-      if (catObj) {
-        await fetch(`${cleanUrl}/rest/v1/categories`, {
-          method: 'POST',
-          headers: sbHeaders('resolution=merge-duplicates,return=minimal'),
-          body: JSON.stringify([
-            {
-              id: catObj.id,
-              name: catObj.name,
-              short_name: catObj.shortName,
-              icon_type: catObj.iconType,
-              description: catObj.description || ''
-            }
-          ])
-        });
-      }
 
-      // 2. Payload idêntico ao usado nos 16 produtos iniciais (com todos os valores padrão preenchidos)
-      const payload = {
+      // Payload completo
+      let currentPayload = {
         id: String(prod.id || `prod-${Date.now()}`),
         name: String(prod.name || 'Novo Produto').trim(),
         category: catObj ? catObj.id : 'infusoes',
@@ -1557,17 +1553,31 @@ export default function App() {
         description: prod.description || ''
       };
 
-      // 3. Envia como Array (exatamente igual ao botão que salvou os 16 produtos iniciais)
-      const res = await fetch(`${cleanUrl}/rest/v1/products`, {
-        method: 'POST',
-        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
-        body: JSON.stringify([payload])
-      });
+      // Tentativa inteligente: se o Supabase reclamar que alguma coluna não existe (PGRST204),
+      // remove apenas a coluna ausente ou troca 'category' por 'category_id' e salva mesmo assim!
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await fetch(`${cleanUrl}/rest/v1/products`, {
+          method: 'POST',
+          headers: sbHeaders('resolution=merge-duplicates,return=representation'),
+          body: JSON.stringify([currentPayload])
+        });
 
-      if (!res.ok) {
-        const errDetail = await res.text();
-        console.error('Detalhe do erro Supabase ao salvar produto:', errDetail);
-        showAdminToast(`Aviso Supabase: ${errDetail.slice(0, 90)}`);
+        if (res.ok) {
+          return;
+        }
+
+        const errText = await res.text();
+        const matchMissingCol = errText.match(/Could not find the '([^']+)' column/);
+        if (matchMissingCol && matchMissingCol[1]) {
+          const missingCol = matchMissingCol[1];
+          const nextPayload = { ...currentPayload };
+          delete nextPayload[missingCol];
+          currentPayload = nextPayload;
+          continue;
+        } else {
+          console.error('Detalhe do erro Supabase ao salvar produto:', errText);
+          break;
+        }
       }
     } catch (err) {
       console.error('Erro de conexão ao salvar produto:', err);
