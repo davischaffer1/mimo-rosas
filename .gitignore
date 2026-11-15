@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+.DS_Store
+Thumbs.db
+*.local
+*.log
+
+# Variáveis de ambiente (chaves, tokens, senhas)
+.env
+.env.*
+!.env.example

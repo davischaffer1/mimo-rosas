@@ -284,11 +284,53 @@ const generatePixCopyPaste = (pixKey, merchantName, merchantCity, amount, txid =
 };
 
 // ============================================================================
+// ROTAS SIMPLES (SPA, sem dependências)
+//   /admin  ou  /painel  ->  Painel Administrativo
+//   qualquer outra URL   ->  Vitrine
+// Funciona também em subpasta (ex.: /mimo-rosas/admin).
+// ============================================================================
+const ADMIN_SEGMENTS = ['admin', 'painel'];
+
+const stripTrailingSlash = (value) => (value || '/').replace(/\/+$/, '');
+
+const readModeFromUrl = () => {
+  try {
+    const segments = stripTrailingSlash(window.location.pathname).split('/').filter(Boolean);
+    const lastSegment = (segments[segments.length - 1] || '').toLowerCase();
+    if (ADMIN_SEGMENTS.includes(lastSegment)) return 'admin';
+    if (new URLSearchParams(window.location.search).get('admin') === '1') return 'admin';
+    if (stripTrailingSlash(window.location.hash).replace(/^#?\/?/, '').toLowerCase() === 'admin') return 'admin';
+  } catch { /* ignora */ }
+  return 'store';
+};
+
+const modeUrl = (mode) => {
+  let segments = [];
+  try {
+    segments = stripTrailingSlash(window.location.pathname).split('/').filter(Boolean);
+    const lastSegment = (segments[segments.length - 1] || '').toLowerCase();
+    if (ADMIN_SEGMENTS.includes(lastSegment)) segments.pop();
+  } catch { /* ignora */ }
+  const basePath = segments.length ? `/${segments.join('/')}` : '';
+  return mode === 'admin' ? `${basePath}/admin` : (basePath || '/');
+};
+
+// ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 export default function App() {
-  const [appMode, setAppMode] = useState('store');
+  const [appMode, setAppMode] = useState(readModeFromUrl);
   const [adminTab, setAdminTab] = useState('products');
+
+  // Troca de "tela" refletindo na URL (permite /admin, botão voltar do navegador, link direto)
+  const goToMode = (mode) => {
+    setAppMode(mode);
+    try {
+      const target = modeUrl(mode);
+      if (window.location.pathname !== target) window.history.pushState({ mode }, '', target);
+    } catch { /* ignora */ }
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { /* ignora */ }
+  };
 
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     try { return localStorage.getItem('mimo_admin_unlocked') === 'true'; } catch { return false; }
@@ -323,7 +365,6 @@ export default function App() {
       autoApproveDemoSeconds: 0,
       freeShippingMin: 120,
       defaultShippingFee: 14.9,
-      hideTopAdminBar: false,
       assistantGreeting: 'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
       adminPassword: 'mimo2026'
     };
@@ -410,10 +451,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('admin') === '1') setAppMode('admin');
-    } catch { /* ignora */ }
+    const syncFromUrl = () => setAppMode(readModeFromUrl());
+    window.addEventListener('popstate', syncFromUrl);
+    window.addEventListener('hashchange', syncFromUrl);
+    return () => {
+      window.removeEventListener('popstate', syncFromUrl);
+      window.removeEventListener('hashchange', syncFromUrl);
+    };
   }, []);
 
   useEffect(() => { try { localStorage.setItem('mimo_db_categories', JSON.stringify(categories)); } catch { /* ignore */ } }, [categories]);
@@ -1295,23 +1339,6 @@ export default function App() {
         .typing-dot:nth-child(3) { animation-delay: 0.3s; }
       `}</style>
 
-      {(!storeConfig.hideTopAdminBar || appMode === 'admin' || isAdminUnlocked) && (
-        <div className="w-full bg-[#3A1C28] text-[#FFF9F3] px-3 py-1.5 text-xs flex items-center justify-between z-50 border-b border-[#A90F4D]/30">
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${sbStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span className="font-medium truncate">Mimo Rosas • <span className="opacity-80 hidden sm:inline">{sbStatus.connected ? 'Supabase Conectado' : 'Loja + Sistema Admin'}</span></span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => setAppMode('store')} className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${appMode === 'store' ? 'bg-[#A90F4D] text-white shadow-xs' : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'}`}>
-              <Eye className="w-3 h-3" /><span>Vitrine (Loja)</span>
-            </button>
-            <button type="button" onClick={() => setAppMode('admin')} className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${appMode === 'admin' ? 'bg-[#A90F4D] text-white shadow-xs' : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'}`}>
-              <Settings className="w-3 h-3" /><span>Painel Admin ({orders.length})</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {appMode === 'admin' ? (
         !isAdminUnlocked ? (
           <div className="w-full max-w-md my-auto p-6 font-sans-clean">
@@ -1328,12 +1355,12 @@ export default function App() {
                 </div>
                 {adminPinError && <p className="text-xs text-red-600 font-medium">{adminPinError}</p>}
                 <button type="submit" className="w-full py-3 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm shadow-md">Entrar no Painel Administrativo</button>
-                <button type="button" onClick={() => setAppMode('store')} className="w-full py-2 rounded-full text-xs text-[#795344] hover:underline text-center">Voltar para a Loja</button>
+                <button type="button" onClick={() => goToMode('store')} className="w-full py-2 rounded-full text-xs text-[#795344] hover:underline text-center">Voltar para a Loja</button>
               </form>
             </div>
           </div>
         ) : (
-          <div className="w-full max-w-5xl min-h-screen bg-[#F6E9E5] p-4 sm:p-6 font-sans-clean space-y-6">
+          <div className="w-full max-w-7xl min-h-screen bg-[#F6E9E5] p-4 sm:p-6 lg:p-8 font-sans-clean space-y-6">
             {adminToast && (
               <div className="fixed bottom-5 right-5 z-50 bg-[#2E7D32] text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-semibold">
                 <Check className="w-4 h-4" /><span>{adminToast}</span>
@@ -1349,7 +1376,18 @@ export default function App() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => setAppMode('store')} className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#E5CFC9] text-xs font-semibold hover:bg-[#A90F4D] hover:text-white transition-colors">Ver Loja ao Vivo →</button>
+                <button onClick={() => goToMode('store')} className="px-4 py-2 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#E5CFC9] text-xs font-semibold hover:bg-[#A90F4D] hover:text-white transition-colors">Ver Loja ao Vivo →</button>
+                <button
+                  onClick={() => {
+                    try { localStorage.removeItem('mimo_admin_unlocked'); } catch { /* ignore */ }
+                    setIsAdminUnlocked(false);
+                    setAdminPinInput('');
+                    goToMode('store');
+                  }}
+                  className="px-4 py-2 rounded-full bg-[#FFF9F3] text-[#795344] border border-[#E5CFC9] text-xs font-semibold hover:bg-[#3A1C28] hover:text-white transition-colors"
+                >
+                  Sair do Painel
+                </button>
               </div>
             </div>
 
@@ -1548,10 +1586,10 @@ export default function App() {
                 </div>
                 <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] text-xs flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-bold text-[#4A2532]">Modo Cliente Limpo (Esconder barra escura do topo para visitantes)</p>
-                    <p className="text-[11px] text-[#795344]">Quando ativado, clientes comuns não veem a barra do topo. Você sempre poderá abrir o painel pelo link <code>mimorosas.com.br/?admin=1</code> ou em <em>Minha Conta</em>.</p>
+                    <p className="font-bold text-[#4A2532]">Acesso ao Painel por link direto</p>
+                    <p className="text-[11px] text-[#795344]">A vitrine não exibe mais atalho para o painel. O acesso é pela URL <code className="text-[#A90F4D] font-semibold">{`${window.location.origin}${modeUrl('admin')}`}</code> — ou, como alternativa, <code>?admin=1</code> no final do endereço.</p>
                   </div>
-                  <input type="checkbox" checked={Boolean(storeConfig.hideTopAdminBar)} onChange={(e) => setStoreConfig({ ...storeConfig, hideTopAdminBar: e.target.checked })} className="w-5 h-5 accent-[#A90F4D] shrink-0 cursor-pointer" />
+                  <button type="button" onClick={() => { try { navigator.clipboard.writeText(`${window.location.origin}${modeUrl('admin')}`); showAdminToast('Link do painel copiado!'); } catch { /* ignore */ } }} className="px-3 py-2 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold shrink-0">Copiar link</button>
                 </div>
                 <div className="text-xs">
                   <label className="block font-semibold mb-1">Mensagem de Boas-vindas da Assistente Mimo Rosas</label>
@@ -1797,57 +1835,78 @@ export default function App() {
           </div>
         )
       ) : (
-        <div className="w-full max-w-[480px] md:max-w-[960px] min-h-screen bg-[#F6E9E5] shadow-[0_0_50px_rgba(121,83,68,0.15)] flex flex-col relative pb-24 font-sans-clean">
-          <header className="sticky top-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md border-b border-[#EFE0DC] px-4 py-2.5">
-            <div className="flex items-center justify-between">
-              <button type="button" onClick={() => setIsSideMenuOpen(true)} aria-label="Abrir menu" className="p-2 -ml-1 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Menu className="w-6 h-6" strokeWidth={1.9} /></button>
-              <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2 focus:outline-none group">
-                <MimoRoseOutlineSVG className="w-10 h-11 sm:w-11 sm:h-12 group-hover:scale-105 transition-transform" />
-                <span className="font-script text-[36px] sm:text-[42px] text-[#A90F4D] leading-none tracking-wide pt-1">Mimo Rosas</span>
-              </button>
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={() => setIsSearchOpen((prev) => !prev)} aria-label="Pesquisar produtos" className="p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Search className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} /></button>
-                <button type="button" onClick={() => setIsCartOpen(true)} aria-label="Abrir carrinho" className={`relative p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition ${cartBounce ? 'scale-125' : ''}`}>
-                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
-                  <span className="absolute top-0.5 right-0.5 min-w-[19px] h-[19px] px-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">{cartCount}</span>
+        <div className="w-full min-h-screen bg-[#F6E9E5] flex flex-col relative pb-24 lg:pb-0 font-sans-clean">
+          <header className="sticky top-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md border-b border-[#EFE0DC]">
+            <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-2.5 lg:py-3">
+              <div className="flex items-center justify-between gap-3 lg:gap-8">
+                <button type="button" onClick={() => setIsSideMenuOpen(true)} aria-label="Abrir menu" className="lg:hidden p-2 -ml-1 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Menu className="w-6 h-6" strokeWidth={1.9} /></button>
+                <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2 focus:outline-none group shrink-0">
+                  <MimoRoseOutlineSVG className="w-10 h-11 sm:w-11 sm:h-12 group-hover:scale-105 transition-transform" />
+                  <span className="font-script text-[34px] sm:text-[42px] text-[#A90F4D] leading-none tracking-wide pt-1">Mimo Rosas</span>
                 </button>
-              </div>
-            </div>
-            {isSearchOpen && (
-              <div className="mt-2.5 pb-1 animate-fadeIn">
-                <div className="relative flex items-center">
-                  <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
-                  <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar infusões, cápsulas de rosa, cuias..." className="w-full pl-10 pr-9 py-2.5 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]" autoFocus />
-                  {searchQuery && (<button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 text-[#795344] hover:text-[#A90F4D]"><X className="w-4 h-4" /></button>)}
+
+                <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
+                  {[
+                    { id: 'home', label: 'Início' },
+                    { id: 'catalog', label: 'Categorias' },
+                    { id: 'favorites', label: 'Favoritos' },
+                    { id: 'account', label: 'Minha Conta' }
+                  ].map((link) => (
+                    <button key={link.id} type="button" onClick={() => setActiveView(link.id)} className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors ${activeView === link.id ? 'bg-[#FCEEF2] text-[#A90F4D]' : 'text-[#5A382E] hover:bg-[#F6E9E5] hover:text-[#A90F4D]'}`}>{link.label}</button>
+                  ))}
+                  <button type="button" onClick={() => setIsAssistantOpen(true)} className="px-3.5 py-2 rounded-full text-sm font-medium text-[#5A382E] hover:bg-[#F6E9E5] hover:text-[#A90F4D] transition-colors flex items-center gap-1.5"><Sparkles className="w-4 h-4" />Atendimento</button>
+                </nav>
+
+                <div className="flex items-center gap-1 lg:gap-2">
+                  <div className="hidden lg:flex relative items-center w-[240px] xl:w-[300px]">
+                    <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
+                    <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar produtos..." className="w-full pl-10 pr-4 py-2 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D] focus:bg-white transition-colors" />
+                  </div>
+                  <button type="button" onClick={() => setIsSearchOpen((prev) => !prev)} aria-label="Pesquisar produtos" className="lg:hidden p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Search className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} /></button>
+                  <button type="button" onClick={() => setIsCartOpen(true)} aria-label="Abrir carrinho" className={`relative p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition ${cartBounce ? 'scale-125' : ''}`}>
+                    <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
+                    <span className="absolute top-0.5 right-0.5 min-w-[19px] h-[19px] px-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">{cartCount}</span>
+                  </button>
                 </div>
               </div>
-            )}
+              {isSearchOpen && (
+                <div className="mt-2.5 pb-1 animate-fadeIn lg:hidden">
+                  <div className="relative flex items-center">
+                    <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
+                    <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar infusões, cápsulas de rosa, cuias..." className="w-full pl-10 pr-9 py-2.5 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]" autoFocus />
+                    {searchQuery && (<button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 text-[#795344] hover:text-[#A90F4D]"><X className="w-4 h-4" /></button>)}
+                  </div>
+                </div>
+              )}
+            </div>
           </header>
 
           <main className="flex-1">
             {activeView === 'home' && (
               <div>
                 <section className="relative w-full overflow-hidden bg-[#F2D7D3]">
-                  <div className="relative min-h-[290px] sm:min-h-[340px] w-full flex items-center">
-                    <img src={HERO_SLIDES[heroIndex].image} alt="Banner Mimo Rosas" className="absolute inset-0 w-full h-full object-cover object-right transition-all duration-700" />
+                  <div className="relative min-h-[300px] sm:min-h-[360px] lg:min-h-[470px] xl:min-h-[520px] w-full flex items-center">
+                    <img src={HERO_SLIDES[heroIndex].image} alt="Banner Mimo Rosas" className="absolute inset-0 w-full h-full object-cover object-[75%_center] lg:object-[80%_center] transition-all duration-700" />
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(246,226,223,0.98) 0%, rgba(246,226,223,0.92) 48%, rgba(246,226,223,0.25) 78%, rgba(246,226,223,0.05) 100%)' }} />
-                    <div className="relative z-10 w-[68%] sm:w-[60%] pl-4 sm:pl-8 py-6">
-                      <h1 className="font-serif-display italic text-[25px] sm:text-[34px] text-[#A90F4D] leading-[1.15]">
-                        {HERO_SLIDES[heroIndex].titleLine1}<br />
-                        <span>{HERO_SLIDES[heroIndex].titleLine2} </span>
-                        <span className="font-script not-italic text-[37px] sm:text-[48px] leading-none">{HERO_SLIDES[heroIndex].titleScript}</span>
-                      </h1>
-                      <div className="-ml-2 my-1"><HeartFlourishSVG className="w-52 sm:w-64 h-7" /></div>
-                      <p className="text-[12.5px] sm:text-[14px] text-[#4E2F26] leading-snug max-w-[240px] sm:max-w-[300px] font-normal">{HERO_SLIDES[heroIndex].subtitle}</p>
-                      <button type="button" onClick={() => {
-                        const target = HERO_SLIDES[heroIndex].targetCategory;
-                        if (target === 'all') catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-                        else navigateCategory(target);
-                      }} className="mt-4 inline-flex items-center gap-2 bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[13px] sm:text-[14px] font-medium px-5 py-2.5 rounded-full shadow-[0_6px_16px_rgba(169,15,77,0.32)] active:scale-95 transition-all">
-                        <span>{HERO_SLIDES[heroIndex].cta}</span><span className="text-base leading-none">→</span>
-                      </button>
+                    <div className="relative z-10 mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8 py-6 lg:py-14">
+                      <div className="w-full sm:w-[62%] lg:w-[48%]">
+                        <h1 className="font-serif-display italic text-[26px] sm:text-[34px] lg:text-[46px] xl:text-[54px] text-[#A90F4D] leading-[1.15]">
+                          {HERO_SLIDES[heroIndex].titleLine1}<br />
+                          <span>{HERO_SLIDES[heroIndex].titleLine2} </span>
+                          <span className="font-script not-italic text-[38px] sm:text-[48px] lg:text-[64px] xl:text-[72px] leading-none">{HERO_SLIDES[heroIndex].titleScript}</span>
+                        </h1>
+                        <div className="-ml-2 my-1"><HeartFlourishSVG className="w-52 sm:w-64 lg:w-80 h-7" /></div>
+                        <p className="text-[12.5px] sm:text-[14px] lg:text-[16px] text-[#4E2F26] leading-snug max-w-[240px] sm:max-w-[300px] lg:max-w-[420px] font-normal">{HERO_SLIDES[heroIndex].subtitle}</p>
+                        <button type="button" onClick={() => {
+                          const target = HERO_SLIDES[heroIndex].targetCategory;
+                          if (target === 'all') catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                          else navigateCategory(target);
+                        }} className="mt-4 lg:mt-6 inline-flex items-center gap-2 bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[13px] sm:text-[14px] lg:text-[15px] font-medium px-5 py-2.5 lg:px-7 lg:py-3.5 rounded-full shadow-[0_6px_16px_rgba(169,15,77,0.32)] active:scale-95 transition-all">
+                          <span>{HERO_SLIDES[heroIndex].cta}</span><span className="text-base leading-none">→</span>
+                        </button>
+                      </div>
                     </div>
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+                    <div className="absolute bottom-3 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
                       {HERO_SLIDES.map((slide, idx) => (
                         <button key={slide.id} type="button" onClick={() => setHeroIndex(idx)} aria-label={`Slide ${idx + 1}`} className={`rounded-full transition-all ${heroIndex === idx ? 'w-2.5 h-2.5 bg-[#A90F4D]' : 'w-2 h-2 bg-[#FFF9F3]/80'}`} />
                       ))}
@@ -1855,29 +1914,29 @@ export default function App() {
                   </div>
                 </section>
 
-                <section className="relative px-3.5 pt-4 pb-2">
-                  <div className="relative">
-                    <div ref={categoryScrollRef} className="flex items-stretch gap-2.5 overflow-x-auto no-scrollbar pr-8 py-1">
+                <section className="relative pt-4 lg:pt-8 pb-2">
+                  <div className="relative mx-auto w-full max-w-[1320px] px-4 lg:px-8">
+                    <div ref={categoryScrollRef} className="flex lg:grid lg:grid-cols-8 items-stretch gap-2.5 lg:gap-4 overflow-x-auto lg:overflow-visible no-scrollbar pr-8 lg:pr-0 py-1">
                       {categories.map((cat) => {
                         const isSelected = selectedCategory === cat.id;
                         return (
-                          <button key={cat.id} type="button" onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)} className={`flex-shrink-0 w-[96px] sm:w-[116px] rounded-[20px] p-2.5 flex flex-col items-center justify-start text-center transition-all duration-200 border ${isSelected ? 'bg-[#FFF9F3] border-[#A90F4D] shadow-md -translate-y-0.5' : 'bg-[#F9ECE8] hover:bg-[#FFF9F3] border-[#F0DCD6] shadow-[0_4px_12px_rgba(121,83,68,0.06)]'}`}>
-                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-1"><CategoryIconSVG type={cat.iconType} /></div>
-                            <span className="text-[11px] sm:text-[12px] font-medium text-[#4E2F26] leading-[1.2] line-clamp-3">{cat.shortName}</span>
+                          <button key={cat.id} type="button" onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)} className={`flex-shrink-0 w-[96px] sm:w-[116px] lg:w-auto rounded-[20px] p-2.5 lg:p-4 flex flex-col items-center justify-start text-center transition-all duration-200 border ${isSelected ? 'bg-[#FFF9F3] border-[#A90F4D] shadow-md -translate-y-0.5' : 'bg-[#F9ECE8] hover:bg-[#FFF9F3] border-[#F0DCD6] shadow-[0_4px_12px_rgba(121,83,68,0.06)]'}`}>
+                            <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center mb-1 lg:mb-2"><CategoryIconSVG type={cat.iconType} /></div>
+                            <span className="text-[11px] sm:text-[12px] lg:text-[13px] font-medium text-[#4E2F26] leading-[1.2] line-clamp-3">{cat.shortName}</span>
                           </button>
                         );
                       })}
                     </div>
-                    <button type="button" onClick={scrollCategoriesRight} aria-label="Rolar categorias" className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#FFF9F3] border border-[#EBD5CF] shadow-md flex items-center justify-center text-[#A90F4D] hover:scale-105 active:scale-95 transition"><ChevronRight className="w-4 h-4" /></button>
+                    <button type="button" onClick={scrollCategoriesRight} aria-label="Rolar categorias" className="lg:hidden absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#FFF9F3] border border-[#EBD5CF] shadow-md flex items-center justify-center text-[#A90F4D] hover:scale-105 active:scale-95 transition"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </section>
 
-                <section ref={catalogSectionRef} className="px-3.5 pt-4 pb-4">
-                  <div className="flex items-center justify-center gap-3 mb-4">
+                <section ref={catalogSectionRef} className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 pt-4 lg:pt-10 pb-4">
+                  <div className="flex items-center justify-center gap-3 mb-4 lg:mb-7">
                     <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
                     <h2 className="text-center flex items-baseline gap-2">
-                      <span className="font-serif-display text-[22px] sm:text-[26px] text-[#4E2F26] font-normal">Nossos</span>
-                      <span className="font-script text-[40px] sm:text-[46px] text-[#A90F4D] leading-none">Destaques</span>
+                      <span className="font-serif-display text-[22px] sm:text-[26px] lg:text-[30px] text-[#4E2F26] font-normal">Nossos</span>
+                      <span className="font-script text-[40px] sm:text-[46px] lg:text-[56px] text-[#A90F4D] leading-none">Destaques</span>
                     </h2>
                     <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
                   </div>
@@ -1887,7 +1946,7 @@ export default function App() {
                       <button type="button" onClick={() => { setSelectedCategory('all'); setSearchQuery(''); }} className="text-[#A90F4D] font-semibold hover:underline ml-2 shrink-0">Ver todos</button>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                     {(selectedCategory === 'all' && !searchQuery ? featuredProducts : filteredProducts).map((product) => renderProductCard(product))}
                   </div>
                   {selectedCategory === 'all' && !searchQuery && (
@@ -1899,19 +1958,19 @@ export default function App() {
                   )}
                 </section>
 
-                <section className="px-3.5 pt-1 pb-4">
-                  <div className="relative rounded-[26px] overflow-hidden p-4 sm:p-6 text-[#FFF9F3] shadow-[0_10px_28px_rgba(169,15,77,0.25)]" style={{ background: 'linear-gradient(100deg, #980B44 0%, #A90F4D 58%, #C43B6E 100%)' }}>
-                    <div className="relative z-10 flex items-center gap-3.5 sm:gap-6">
-                      <div className="shrink-0"><MimoRoseOutlineSVG className="w-16 h-20 sm:w-20 sm:h-24" strokeColor="#FFF9F3" /></div>
+                <section className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 pt-1 lg:pt-6 pb-4 lg:pb-12">
+                  <div className="relative rounded-[26px] overflow-hidden p-4 sm:p-6 lg:p-9 text-[#FFF9F3] shadow-[0_10px_28px_rgba(169,15,77,0.25)]" style={{ background: 'linear-gradient(100deg, #980B44 0%, #A90F4D 58%, #C43B6E 100%)' }}>
+                    <div className="relative z-10 flex items-center gap-3.5 sm:gap-6 lg:gap-10">
+                      <div className="shrink-0"><MimoRoseOutlineSVG className="w-16 h-20 sm:w-20 sm:h-24 lg:w-28 lg:h-32" strokeColor="#FFF9F3" /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-serif-display text-[17px] sm:text-[22px] leading-tight">Artesanal, <span className="italic font-normal">com muito</span> <span className="font-script text-[29px] sm:text-[36px] leading-none">amor</span></h3>
-                          <Heart className="w-4 h-4 text-[#FAD4E0] inline shrink-0" />
+                          <h3 className="font-serif-display text-[17px] sm:text-[22px] lg:text-[30px] leading-tight">Artesanal, <span className="italic font-normal">com muito</span> <span className="font-script text-[29px] sm:text-[36px] lg:text-[46px] leading-none">amor</span></h3>
+                          <Heart className="w-4 h-4 lg:w-5 lg:h-5 text-[#FAD4E0] inline shrink-0" />
                         </div>
-                        <div className="w-44 h-[1px] bg-[#F6B8CC]/60 my-1.5" />
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-1">
-                          <p className="text-[11.5px] sm:text-[13px] text-[#FCEEF2] leading-snug max-w-[210px]">Cuidados em cada detalhe para encantar em cada escolha.</p>
-                          <button type="button" onClick={() => setIsAboutModalOpen(true)} className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 bg-[#FCE5EC] hover:bg-white text-[#A90F4D] text-[11.5px] sm:text-[12.5px] font-semibold px-3.5 py-2 rounded-full shadow-sm active:scale-95 transition"><span>Sobre a Mimo Rosas</span><span>→</span></button>
+                        <div className="w-44 lg:w-64 h-[1px] bg-[#F6B8CC]/60 my-1.5" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 lg:gap-6 mt-1">
+                          <p className="text-[11.5px] sm:text-[13px] lg:text-[15px] text-[#FCEEF2] leading-snug max-w-[210px] sm:max-w-[300px] lg:max-w-[420px]">Cuidados em cada detalhe para encantar em cada escolha.</p>
+                          <button type="button" onClick={() => setIsAboutModalOpen(true)} className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 bg-[#FCE5EC] hover:bg-white text-[#A90F4D] text-[11.5px] sm:text-[12.5px] lg:text-[14px] font-semibold px-3.5 py-2 lg:px-6 lg:py-3 rounded-full shadow-sm active:scale-95 transition"><span>Sobre a Mimo Rosas</span><span>→</span></button>
                         </div>
                       </div>
                     </div>
@@ -1921,11 +1980,11 @@ export default function App() {
             )}
 
             {activeView === 'catalog' && (
-              <div className="px-3.5 py-4 space-y-4">
+              <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-4 lg:py-8 space-y-4 lg:space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <button type="button" onClick={() => setActiveView('home')} className="inline-flex items-center gap-1 text-xs text-[#A90F4D] font-semibold mb-1"><ChevronLeft className="w-4 h-4" /><span>Voltar ao Início</span></button>
-                    <h1 className="font-serif-display text-2xl text-[#4E2F26] font-semibold">{selectedCategory === 'all' ? 'Catálogo Completo' : categories.find((c) => c.id === selectedCategory)?.name}</h1>
+                    <h1 className="font-serif-display text-2xl lg:text-3xl text-[#4E2F26] font-semibold">{selectedCategory === 'all' ? 'Catálogo Completo' : categories.find((c) => c.id === selectedCategory)?.name}</h1>
                   </div>
                   <div className="flex items-center gap-1.5 bg-[#FFF9F3] px-3 py-1.5 rounded-full border border-[#EBD5CF] text-xs">
                     <SlidersHorizontal className="w-3.5 h-3.5 text-[#A90F4D]" />
@@ -1942,21 +2001,21 @@ export default function App() {
                     <button key={cat.id} type="button" onClick={() => setSelectedCategory(cat.id)} className={`px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${selectedCategory === cat.id ? 'bg-[#A90F4D] text-white' : 'bg-[#FFF9F3] text-[#5A382E] border border-[#EBD5CF]'}`}>{cat.shortName}</button>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 lg:gap-6">
                   {filteredProducts.map((product) => renderProductCard(product))}
                 </div>
               </div>
             )}
 
             {activeView === 'product' && selectedProduct && (
-              <div className="px-3.5 py-4 space-y-5">
+              <div className="mx-auto w-full max-w-[1180px] px-4 lg:px-8 py-4 lg:py-8 space-y-5">
                 <div className="flex items-center justify-between">
                   <button type="button" onClick={() => setActiveView('home')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#A90F4D] bg-[#FFF9F3] px-3.5 py-2 rounded-full border border-[#EBD5CF]"><ChevronLeft className="w-4 h-4" /><span>Voltar</span></button>
                   <button type="button" onClick={(e) => toggleFavorite(selectedProduct.id, e)} className="inline-flex items-center gap-1.5 text-xs font-medium text-[#A90F4D] bg-[#FFF9F3] px-3.5 py-2 rounded-full border border-[#EBD5CF]">
                     <Heart className="w-4 h-4" fill={favorites.includes(selectedProduct.id) ? '#A90F4D' : 'none'} /><span>{favorites.includes(selectedProduct.id) ? 'Salvo' : 'Favoritar'}</span>
                   </button>
                 </div>
-                <div className="bg-[#FFF9F3] rounded-[28px] p-4 sm:p-6 border border-[#EBD5CF] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-[#FFF9F3] rounded-[28px] p-4 sm:p-6 lg:p-9 border border-[#EBD5CF] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-10">
                   <div className="space-y-2.5">
                     <div className="aspect-square rounded-[22px] overflow-hidden bg-[#F6E9E5] relative">
                       <img src={selectedProduct.gallery?.[activeGalleryIdx] || selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
@@ -2009,15 +2068,15 @@ export default function App() {
             )}
 
             {activeView === 'favorites' && (
-              <div className="px-3.5 py-4 space-y-4">
-                <h1 className="font-serif-display text-2xl text-[#4E2F26] font-semibold">Meus Favoritos ({favorites.length})</h1>
+              <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-4 lg:py-8 space-y-4 lg:space-y-6">
+                <h1 className="font-serif-display text-2xl lg:text-3xl text-[#4E2F26] font-semibold">Meus Favoritos ({favorites.length})</h1>
                 {favorites.length === 0 ? (
                   <div className="bg-[#FFF9F3] rounded-3xl p-8 text-center border border-[#EBD5CF]">
                     <Heart className="w-10 h-10 text-[#A90F4D] mx-auto mb-2 opacity-60" />
                     <p className="text-sm text-[#795344]">Sua lista de desejos ainda está vazia.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 lg:gap-6">
                     {visibleProducts.filter((p) => favorites.includes(p.id)).map((product) => renderProductCard(product))}
                   </div>
                 )}
@@ -2025,22 +2084,39 @@ export default function App() {
             )}
 
             {activeView === 'account' && (
-              <div className="px-3.5 py-4 space-y-4">
-                <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] flex items-center justify-between gap-4">
+              <div className="mx-auto w-full max-w-[1000px] px-4 lg:px-8 py-4 lg:py-10 space-y-4 lg:space-y-6">
+                <div className="bg-[#FFF9F3] rounded-3xl p-5 lg:p-8 border border-[#EBD5CF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
                     <div className="w-14 h-14 rounded-full bg-[#F6E9E5] border border-[#E2B8C4] flex items-center justify-center text-[#A90F4D]"><User className="w-7 h-7" /></div>
                     <div>
-                      <h1 className="font-serif-display text-xl font-bold text-[#4A2532]">Espaço Cliente Mimo Rosas</h1>
-                      <p className="text-xs text-[#795344]">Acompanhe seus pedidos e favoritos</p>
+                      <h1 className="font-serif-display text-xl lg:text-2xl font-bold text-[#4A2532]">Espaço Cliente Mimo Rosas</h1>
+                      <p className="text-xs lg:text-sm text-[#795344]">Acompanhe seus favoritos e fale com a gente</p>
                     </div>
                   </div>
-                  <button onClick={() => setAppMode('admin')} className="px-3.5 py-2 rounded-full bg-[#A90F4D] text-white text-xs font-semibold flex items-center gap-1.5"><Settings className="w-3.5 h-3.5" /><span>Abrir Painel Admin</span></button>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <button type="button" onClick={() => setActiveView('favorites')} className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#A90F4D] hover:shadow-md transition-all">
+                    <span className="w-11 h-11 rounded-2xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center"><Heart className="w-5 h-5" /></span>
+                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Meus Favoritos</h2>
+                    <p className="text-xs text-[#795344] mt-1">{favorites.length} {favorites.length === 1 ? 'produto salvo' : 'produtos salvos'}</p>
+                  </button>
+                  <button type="button" onClick={() => setIsAssistantOpen(true)} className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#A90F4D] hover:shadow-md transition-all">
+                    <span className="w-11 h-11 rounded-2xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center"><Sparkles className="w-5 h-5" /></span>
+                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Atendimento Virtual</h2>
+                    <p className="text-xs text-[#795344] mt-1">Tire dúvidas sobre produtos e pedidos</p>
+                  </button>
+                  <a href={`https://wa.me/${String(storeConfig.whatsappNumber || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#25D366] hover:shadow-md transition-all">
+                    <span className="w-11 h-11 rounded-2xl bg-[#EAF9EF] text-[#1EBE5B] flex items-center justify-center"><ShoppingCart className="w-5 h-5" /></span>
+                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Falar no WhatsApp</h2>
+                    <p className="text-xs text-[#795344] mt-1">Atendimento humano direto com a loja</p>
+                  </a>
                 </div>
               </div>
             )}
 
             {activeView === 'checkout' && (
-              <div className="px-3.5 py-4 space-y-4">
+              <div className="mx-auto w-full max-w-[1100px] px-4 lg:px-8 py-4 lg:py-8 space-y-4 lg:space-y-6">
                 <div className="flex items-center justify-between">
                   <button type="button" onClick={() => setActiveView('home')} className="inline-flex items-center gap-1 text-xs font-semibold text-[#A90F4D]"><ChevronLeft className="w-4 h-4" /><span>Continuar comprando</span></button>
                   <span className="text-xs font-semibold text-[#795344]">Checkout Seguro Mimo Rosas</span>
@@ -2134,7 +2210,7 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                  <form onSubmit={handleCheckoutSubmit} className="grid gap-4 lg:grid-cols-2 lg:items-start">
                     <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
                       <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">1. Seus Dados</h2>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2165,7 +2241,7 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
+                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3 lg:col-span-2">
                       <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento e Resumo ({formatBRL(cartTotal)})</h2>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* BOTÃO PIX DIRETO */}
@@ -2217,7 +2293,44 @@ export default function App() {
             )}
           </main>
 
-          <button type="button" onClick={() => setIsAssistantOpen(true)} className="fixed bottom-[76px] right-3 sm:right-6 z-30 bg-[#FFF9F3] hover:bg-white text-[#3B231C] pl-2 pr-4 py-2 rounded-full shadow-[0_8px_24px_rgba(89,40,58,0.22)] border border-[#EBD5CF] flex items-center gap-2 active:scale-95 transition-all">
+          <footer className="hidden lg:block border-t border-[#EFE0DC] bg-[#FFF9F3] mt-6">
+            <div className="mx-auto w-full max-w-[1320px] px-8 py-12 grid grid-cols-[1.4fr_1fr_1fr_1.2fr] gap-10">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MimoRoseOutlineSVG className="w-9 h-10" />
+                  <span className="font-script text-4xl text-[#A90F4D] leading-none">Mimo Rosas</span>
+                </div>
+                <p className="text-sm text-[#6D493B] leading-relaxed max-w-[320px]">Presentes, aromas e sabores artesanais para transformar o chimarrão, o chá e o café em pequenos rituais de afeto.</p>
+              </div>
+              <div className="space-y-2.5">
+                <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[#9A7468]">Loja</h3>
+                <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); }} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Início</button>
+                <button type="button" onClick={() => setActiveView('catalog')} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Catálogo completo</button>
+                <button type="button" onClick={() => setActiveView('favorites')} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Meus favoritos</button>
+                <button type="button" onClick={() => setIsAboutModalOpen(true)} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Sobre a Mimo Rosas</button>
+              </div>
+              <div className="space-y-2.5">
+                <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[#9A7468]">Atendimento</h3>
+                <button type="button" onClick={() => setIsAssistantOpen(true)} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Assistente virtual</button>
+                <a href={`https://wa.me/${String(storeConfig.whatsappNumber || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">WhatsApp da loja</a>
+                <button type="button" onClick={() => setActiveView('checkout')} className="block text-sm text-[#5A382E] hover:text-[#A90F4D] transition-colors">Finalizar compra</button>
+              </div>
+              <div className="space-y-2.5">
+                <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[#9A7468]">Pagamento e Entrega</h3>
+                <p className="text-sm text-[#6D493B] leading-relaxed">PIX instantâneo e cartão de crédito via Mercado Pago. Envio para todo o Brasil e retirada no ateliê.</p>
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">PIX</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">Cartão</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">Mercado Pago</span>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-[#EFE0DC] py-4">
+              <p className="text-center text-xs text-[#9A7468]">© {new Date().getFullYear()} Mimo Rosas • Presentes, aromas e sabores • Feito com carinho</p>
+            </div>
+          </footer>
+
+          <button type="button" onClick={() => setIsAssistantOpen(true)} className="fixed bottom-[76px] right-3 sm:right-6 lg:bottom-8 lg:right-8 z-30 bg-[#FFF9F3] hover:bg-white text-[#3B231C] pl-2 pr-4 py-2 rounded-full shadow-[0_8px_24px_rgba(89,40,58,0.22)] border border-[#EBD5CF] flex items-center gap-2 active:scale-95 transition-all">
             <span className="relative w-8 h-8 rounded-full bg-[#38C958] flex items-center justify-center text-white shadow-xs">
               <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2Z" /></svg>
             </span>
@@ -2225,7 +2338,7 @@ export default function App() {
             <span className="w-2.5 h-2.5 rounded-full bg-[#38C958]" />
           </button>
 
-          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] md:max-w-[960px] z-30 bg-[#FFF9F3] border-t border-[#EAD6D0] px-2 pt-1.5 pb-2 shadow-[0_-4px_20px_rgba(121,83,68,0.08)]">
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FFF9F3] border-t border-[#EAD6D0] px-2 pt-1.5 pb-2 shadow-[0_-4px_20px_rgba(121,83,68,0.08)]">
             <div className="grid grid-cols-5 items-center">
               <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); }} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'home' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><Home className="w-5 h-5" /><span className="text-[11px] font-medium">Início</span></button>
               <button type="button" onClick={() => setActiveView('catalog')} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'catalog' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><LayoutGrid className="w-5 h-5" /><span className="text-[11px] font-medium">Categorias</span></button>
@@ -2257,9 +2370,9 @@ export default function App() {
                   </div>
                 </div>
                 <div className="pt-4 border-t border-[#EFE0DC]">
-                  <button type="button" onClick={() => { setIsSideMenuOpen(false); setAppMode('admin'); }} className="w-full py-2.5 rounded-full bg-[#3A1C28] text-white text-xs font-semibold flex items-center justify-center gap-2">
-                    <Settings className="w-4 h-4" /><span>Acessar Painel Admin</span>
-                  </button>
+                  <a href={`https://wa.me/${String(storeConfig.whatsappNumber || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-full py-2.5 rounded-full bg-[#25D366] text-white text-xs font-semibold flex items-center justify-center gap-2">
+                    <span>Falar no WhatsApp</span>
+                  </a>
                 </div>
               </aside>
             </div>
