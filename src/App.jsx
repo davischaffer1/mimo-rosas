@@ -1505,66 +1505,72 @@ export default function App() {
     try {
       const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
 
-      // 1. Garante que a categoria existe para não dar erro 400 de Foreign Key
-      const catObj = categories.find((c) => c.id === prod.category);
+      // 1. Garante que a categoria existe na tabela categories antes de salvar o produto
+      const catObj =
+        categories.find((c) => c.id === prod.category) || categories[0];
       if (catObj) {
-        await fetch(`${cleanUrl}/rest/v1/categories?on_conflict=id`, {
+        await fetch(`${cleanUrl}/rest/v1/categories`, {
           method: 'POST',
           headers: sbHeaders('resolution=merge-duplicates,return=minimal'),
-          body: JSON.stringify({
-            id: catObj.id,
-            name: catObj.name,
-            short_name: catObj.shortName,
-            icon_type: catObj.iconType,
-            description: catObj.description || ''
-          })
+          body: JSON.stringify([
+            {
+              id: catObj.id,
+              name: catObj.name,
+              short_name: catObj.shortName,
+              icon_type: catObj.iconType,
+              description: catObj.description || ''
+            }
+          ])
         });
       }
 
+      // 2. Payload idêntico ao usado nos 16 produtos iniciais (com todos os valores padrão preenchidos)
       const payload = {
-        id: String(prod.id),
-        name: prod.name,
-        category: prod.category,
-        price: Number(prod.price) || 0,
+        id: String(prod.id || `prod-${Date.now()}`),
+        name: String(prod.name || 'Novo Produto').trim(),
+        category: catObj ? catObj.id : 'infusoes',
+        price: Number(String(prod.price).replace(',', '.')) || 0,
         stock: Math.round(Number(prod.stock) || 0),
-        badge: prod.badge || null,
+        badge:
+          prod.badge && String(prod.badge).trim() !== ''
+            ? String(prod.badge).trim()
+            : null,
         badge_type: prod.badgeType || 'star',
         featured: Boolean(prod.featured),
         active: prod.active !== false,
-        rating: Number(prod.rating || 5),
-        reviews: Math.round(Number(prod.reviews || 10)),
-        image: prod.image,
-        gallery: Array.isArray(prod.gallery) ? prod.gallery : [prod.image],
-        variations: Array.isArray(prod.variations) ? prod.variations : ['Padrão'],
+        rating: Number(prod.rating || 5.0),
+        reviews: Math.round(Number(prod.reviews || 15)),
+        image:
+          prod.image ||
+          'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
+        gallery:
+          Array.isArray(prod.gallery) && prod.gallery.length > 0
+            ? prod.gallery
+            : [
+                prod.image ||
+                  'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85'
+              ],
+        variations:
+          Array.isArray(prod.variations) && prod.variations.length > 0
+            ? prod.variations
+            : ['Padrão'],
         description: prod.description || ''
       };
 
-      // 2. Faz UPSERT explícito com ?on_conflict=id
-      const res = await fetch(`${cleanUrl}/rest/v1/products?on_conflict=id`, {
+      // 3. Envia como Array (exatamente igual ao botão que salvou os 16 produtos iniciais)
+      const res = await fetch(`${cleanUrl}/rest/v1/products`, {
         method: 'POST',
-        headers: sbHeaders('resolution=merge-duplicates,return=minimal'),
-        body: JSON.stringify(payload)
+        headers: sbHeaders('resolution=merge-duplicates,return=representation'),
+        body: JSON.stringify([payload])
       });
 
-      // 3. Fallback caso a tabela do Supabase tenha menos colunas
       if (!res.ok) {
-        await fetch(
-          `${cleanUrl}/rest/v1/products?id=eq.${encodeURIComponent(prod.id)}`,
-          {
-            method: 'PATCH',
-            headers: sbHeaders('return=minimal'),
-            body: JSON.stringify({
-              name: payload.name,
-              price: payload.price,
-              stock: payload.stock,
-              image: payload.image,
-              description: payload.description
-            })
-          }
-        );
+        const errDetail = await res.text();
+        console.error('Detalhe do erro Supabase ao salvar produto:', errDetail);
+        showAdminToast(`Aviso Supabase: ${errDetail.slice(0, 90)}`);
       }
-    } catch {
-      // fallback local
+    } catch (err) {
+      console.error('Erro de conexão ao salvar produto:', err);
     }
   };
 
@@ -2316,11 +2322,14 @@ export default function App() {
                         badgeType: 'leaf',
                         featured: true,
                         active: true,
+                        rating: 5.0,
+                        reviews: 15,
                         image:
                           'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85',
                         gallery: [
                           'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85'
                         ],
+                        variations: ['Padrão', 'Edição Presente'],
                         variationsText: 'Padrão, Edição Presente',
                         description: ''
                       });
