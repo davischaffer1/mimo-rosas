@@ -4357,6 +4357,35 @@ export default function App() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* VIEW: CHECKOUT (MERCADO PAGO CHECKOUT PRO + QR CODE PIX + CARTÃO) */}
+            {activeView === 'checkout' && (
+              <div className="px-3.5 py-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('home')}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#A90F4D]"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Continuar comprando</span>
+                  </button>
+                  <span className="text-xs font-semibold text-[#795344]">
+                    Checkout Seguro Mimo Rosas
+                  </span>
+                </div>
+
+                {orderSuccess ? (
+                  <div className="bg-[#FFF9F3] rounded-3xl p-5 sm:p-7 border border-[#EBD5CF] text-center space-y-4 shadow-md">
+                    {orderSuccess.paymentConfirmed ? (
+                      <div className="flex justify-center">
+                        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          Pagamento Confirmado • Pedido #{orderSuccess.code}
+                        </span>
+                      </div>
+                    ) : (
                       <div className="flex justify-center">
                         <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold animate-pulse">
                           <QrCode className="w-4 h-4 text-amber-700" />
