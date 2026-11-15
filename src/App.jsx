@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// CONFIGURAÇÃO DO SUPABASE PRÉ-CONECTADA AO PROJETO DA MIMO ROSAS
+// CONFIGURAÇÃO DO SUPABASE
 // ============================================================================
 const DEFAULT_SUPABASE_URL = 'https://dktpnqekuxtsqmazelox.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_7WyhLNtUeEMNnbE_MyTo2g_IYrCA8AU';
@@ -364,8 +364,7 @@ export default function App() {
   const [checkoutData, setCheckoutData] = useState({
     name: '', phone: '', email: '',
     cep: '', address: '', number: '', complement: '', neighborhood: '', city: '',
-    notes: '', deliveryMethod: 'delivery', paymentMethod: 'mercadopago',
-    cardNumber: '', cardHolder: '', cardExpiry: '', cardCvv: ''
+    notes: '', deliveryMethod: 'delivery', paymentMethod: 'pix'
   });
   const [orderSuccess, setOrderSuccess] = useState(() => {
     try { const s = localStorage.getItem('mimo_active_order'); return s ? JSON.parse(s) : null; } catch { return null; }
@@ -784,7 +783,7 @@ export default function App() {
           mpCheckoutProUrl: prev?.mpCheckoutProUrl || null,
           pixCode: prev?.pixCode || pixCode,
           qrCodeUrl: prev?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`,
-          whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(isReallyApproved ? `Olá Mimo Rosas! 🌹 Meu pagamento do pedido *${orderRef}* (${formatBRL(totalVal)}) já foi confirmado automaticamente!` : `Olá Mimo Rosas! 🌹 Fiz o pedido *${orderRef}* (${formatBRL(totalVal)}) e estou finalizando o pagamento PIX.`)}`
+          whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(isReallyApproved ? `Olá Mimo Rosas! 🌹 Meu pagamento do pedido *${orderRef}* (${formatBRL(totalVal)}) já foi confirmado automaticamente!` : `Olá Mimo Rosas! 🌹 Fiz o pedido *${orderRef}* (${formatBRL(totalVal)}) e estou finalizando o pagamento.`)}`
         }));
         window.history.replaceState({}, document.title, window.location.pathname);
       } catch { /* ignora */ }
@@ -870,7 +869,7 @@ export default function App() {
   const scrollCategoriesRight = () => { if (categoryScrollRef.current) categoryScrollRef.current.scrollBy({ left: 220, behavior: 'smooth' }); };
 
   // ============================================================================
-  // ✅ BUG CORRIGIDO #1 — handleAssistantOption COMPLETA
+  // ASSISTENTE VIRTUAL
   // ============================================================================
   const handleAssistantOption = (optionType, customQuestion = null) => {
     const userLabel = customQuestion || ({ produtos: 'Conhecer produtos', precos: 'Consultar preços', presentes: 'Encontrar presentes', duvidas: 'Tirar dúvidas', pedidos: 'Ajuda com pedidos' })[optionType];
@@ -924,9 +923,6 @@ export default function App() {
     }, 900);
   };
 
-  // ============================================================================
-  // ✅ BUG CORRIGIDO #2 — handleChatSubmit ADICIONADA
-  // ============================================================================
   const handleChatSubmit = (e) => {
     e.preventDefault();
     const userText = chatInput.trim();
@@ -971,7 +967,7 @@ export default function App() {
   };
 
   // ============================================================================
-  // CHECKOUT
+  // CHECKOUT INTELIGENTE: PIX DIRETO NA TELA + CARTÃO VIA CHECKOUT PRO
   // ============================================================================
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
@@ -998,7 +994,7 @@ export default function App() {
         cep: checkoutData.cep || '-',
         notes: checkoutData.notes || '',
         paymentMethod: checkoutData.paymentMethod,
-        status: checkoutData.paymentMethod === 'card' ? 'Pago' : 'Aguardando PIX',
+        status: 'Aguardando PIX',
         total: Number(cartTotal.toFixed(2)),
         shipping: Number(shippingFee.toFixed(2)),
         date: nowFormatted,
@@ -1028,20 +1024,47 @@ export default function App() {
       let mpPaymentId = null;
       let mpCheckoutProUrl = null;
       let mpPreferenceId = null;
+      
       const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
+      const hasMpToken = activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-');
 
-      if (activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-')) {
+      // ==========================================
+      // FLUXO 1: CARTÃO DE CRÉDITO (CHECKOUT PRO)
+      // ==========================================
+      if (checkoutData.paymentMethod === 'mercadopago' && hasMpToken) {
         try {
           const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
-          const mpItems = cart.map((item) => ({ id: String(item.id), title: `${item.name} (${item.variation})`, quantity: Number(item.quantity), currency_id: 'BRL', unit_price: Number(Number(item.price).toFixed(2)) }));
-          if (shippingFee > 0) mpItems.push({ id: 'frete', title: 'Frete / Entrega Mimo Rosas', quantity: 1, currency_id: 'BRL', unit_price: Number(Number(shippingFee).toFixed(2)) });
+          const mpItems = cart.map((item) => ({
+            id: String(item.id),
+            title: `${item.name} (${item.variation})`,
+            quantity: Number(item.quantity),
+            currency_id: 'BRL',
+            unit_price: Number(Number(item.price).toFixed(2))
+          }));
+
+          if (shippingFee > 0) {
+            mpItems.push({
+              id: 'frete',
+              title: 'Frete / Entrega Mimo Rosas',
+              quantity: 1,
+              currency_id: 'BRL',
+              unit_price: Number(Number(shippingFee).toFixed(2))
+            });
+          }
 
           const prefRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${activeMpToken}`, 'Content-Type': 'application/json' },
+            headers: {
+              Authorization: `Bearer ${activeMpToken}`,
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
               items: mpItems,
-              payer: { name: checkoutData.name.trim(), email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`, phone: { number: checkoutData.phone.replace(/\D/g, '') } },
+              payer: {
+                name: checkoutData.name.trim(),
+                email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
+                phone: { number: checkoutData.phone.replace(/\D/g, '') }
+              },
               external_reference: code,
               back_urls: {
                 success: `${currentOrigin}/?mp_return=success&order_id=${code}`,
@@ -1052,6 +1075,7 @@ export default function App() {
               statement_descriptor: 'MIMOROSAS'
             })
           });
+
           if (prefRes.ok) {
             const prefData = await prefRes.json();
             if (prefData.init_point) {
@@ -1061,20 +1085,30 @@ export default function App() {
               await saveOrderToSupabase(newOrder);
             }
           }
-        } catch { /* fallback */ }
+        } catch (err) { console.error("Erro MP Pref:", err); }
       }
 
-      if ((checkoutData.paymentMethod === 'pix' || !mpCheckoutProUrl) && (activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-'))) {
+      // ==========================================
+      // FLUXO 2: PIX DIRETO NA TELA
+      // ==========================================
+      if (checkoutData.paymentMethod === 'pix' && hasMpToken) {
         try {
           const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${activeMpToken}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': `${code}-${Date.now()}` },
+            headers: {
+              Authorization: `Bearer ${activeMpToken}`,
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': `${code}-${Date.now()}`
+            },
             body: JSON.stringify({
               transaction_amount: Number(cartTotal.toFixed(2)),
               description: `Pedido ${code} - Mimo Rosas`,
               payment_method_id: 'pix',
               external_reference: code,
-              payer: { email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`, first_name: checkoutData.name.split(' ')[0] || 'Cliente' }
+              payer: {
+                email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
+                first_name: checkoutData.name.split(' ')[0] || 'Cliente'
+              }
             })
           });
           if (mpRes.ok) {
@@ -1082,13 +1116,15 @@ export default function App() {
             const txData = mpData?.point_of_interaction?.transaction_data;
             if (txData?.qr_code) {
               pixCode = txData.qr_code;
-              qrCodeUrl = txData.qr_code_base64 ? `data:image/png;base64,${txData.qr_code_base64}` : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+              qrCodeUrl = txData.qr_code_base64
+                ? `data:image/png;base64,${txData.qr_code_base64}`
+                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
               mpPaymentId = String(mpData.id);
               newOrder.mpPaymentId = mpPaymentId;
               await saveOrderToSupabase(newOrder);
             }
           }
-        } catch { /* mantém QR padrão */ }
+        } catch (err) { console.error("Erro MP Pix:", err); }
       }
 
       const itemsSummaryText = newOrder.items.map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`).join('\n');
@@ -1097,14 +1133,14 @@ export default function App() {
         `*Cliente:* ${checkoutData.name}\n` +
         `*Telefone:* ${checkoutData.phone}\n` +
         `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
-        `*Pagamento:* ${checkoutData.paymentMethod === 'mercadopago' ? 'Checkout Pro Mercado Pago' : checkoutData.paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}\n\n` +
+        `*Pagamento:* ${checkoutData.paymentMethod === 'mercadopago' ? 'Cartão de Crédito' : 'PIX'}\n\n` +
         `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
         `*Total:* ${formatBRL(cartTotal)}`;
 
       const successObj = {
         code, customer: checkoutData.name, total: cartTotal,
         method: checkoutData.paymentMethod, delivery: checkoutData.deliveryMethod,
-        paymentConfirmed: checkoutData.paymentMethod === 'card',
+        paymentConfirmed: false,
         mpPaymentId, mpPreferenceId, mpCheckoutProUrl, pixCode, qrCodeUrl,
         whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`
       };
@@ -1113,14 +1149,16 @@ export default function App() {
       try { localStorage.setItem('mimo_active_order', JSON.stringify(successObj)); } catch { /* ignore */ }
       setCart([]);
 
-      if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) window.location.href = mpCheckoutProUrl;
+      if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) {
+        window.location.href = mpCheckoutProUrl;
+      }
     } finally {
       setIsSubmittingCheckout(false);
     }
   };
 
   // ============================================================================
-  // POLLING AUTOMÁTICO DE PIX
+  // POLLING AUTOMÁTICO DE PIX + VISIBILITY CHANGE
   // ============================================================================
   useEffect(() => {
     if (!orderSuccess || (orderSuccess.method !== 'pix' && orderSuccess.method !== 'mercadopago') || orderSuccess.paymentConfirmed) return;
@@ -1131,7 +1169,7 @@ export default function App() {
       setOrderSuccess((prev) => prev ? { ...prev, paymentConfirmed: true, whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}` } : null);
     };
 
-    const interval = setInterval(async () => {
+    const checkPayment = async () => {
       setPixCheckCount((c) => c + 1);
       const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
       if (mpCheck && mpCheck.status === 'approved') { await markOrderAsPaidAutomatically(); return; }
@@ -1151,8 +1189,21 @@ export default function App() {
       if (demoSecs > 0) {
         setPixCheckCount((currentCount) => { if (currentCount * 3 >= demoSecs) markOrderAsPaidAutomatically(); return currentCount; });
       }
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+
+    const interval = setInterval(checkPayment, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkPayment();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, [orderSuccess, supabaseUrl, supabaseKey, storeConfig]); // eslint-disable-line
 
   const syncAllPendingOrdersWithMercadoPago = async (silent = false) => {
@@ -1510,9 +1561,9 @@ export default function App() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-semibold mb-1 text-[#4A2532]">Access Token Mercado Pago (Opcional)</label>
+                      <label className="block font-semibold mb-1 text-[#4A2532]">Access Token Mercado Pago (Obrigatório)</label>
                       <input type="password" value={storeConfig.mercadoPagoAccessToken || ''} onChange={(e) => setStoreConfig({ ...storeConfig, mercadoPagoAccessToken: e.target.value })} placeholder="APP_USR-0000000000000000-..." className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[11px]" />
-                      <p className="text-[10.5px] text-[#795344] mt-1">Quando preenchido, consulta o banco sozinho e aprova na tela do cliente assim que o PIX é pago.</p>
+                      <p className="text-[10.5px] text-[#795344] mt-1">Quando preenchido, o site gera o PIX e o Checkout de Cartão nativos.</p>
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-[#4A2532]">Tempo de Auto-Confirmação p/ Testes (0 = Desativado)</label>
@@ -2062,10 +2113,16 @@ export default function App() {
                               <p className="text-[11px] text-[#795344] text-center pt-0.5">Recebedor: <strong>{storeConfig.pixHolderName || 'Mimo Rosas'}</strong> • Chave: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong></p>
                             </div>
                             <div className="pt-2 border-t border-[#E5CFC9]">
-                              <div className="w-full py-3 px-4 rounded-2xl bg-[#FFF9F3] border border-[#DFC3BC] text-[#4A2532] text-xs font-semibold flex items-center justify-center gap-2.5 shadow-2xs">
+                              <button 
+                                onClick={() => {
+                                  window.dispatchEvent(new Event('focus'));
+                                  showAdminToast('Verificando pagamento...');
+                                }}
+                                className="w-full py-3 px-4 rounded-2xl bg-[#FFF9F3] hover:bg-white border border-[#DFC3BC] text-[#4A2532] text-xs font-semibold flex items-center justify-center gap-2.5 shadow-2xs transition-colors cursor-pointer"
+                              >
                                 <RefreshCw className="w-4 h-4 text-[#A90F4D] animate-spin shrink-0" />
-                                <span>Aguardando confirmação automática do banco... (verificando em tempo real)</span>
-                              </div>
+                                <span>Já pagou? Clique aqui para verificar agora!</span>
+                              </button>
                             </div>
                           </>
                         ) : (
@@ -2120,30 +2177,48 @@ export default function App() {
 
                     <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
                       <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento e Resumo ({formatBRL(cartTotal)})</h2>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <button type="button" onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'mercadopago' })} className={`p-3 rounded-2xl border flex items-center gap-2 ${checkoutData.paymentMethod === 'mercadopago' ? 'border-[#009EE3] bg-[#F0F9FF]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
-                          <ShieldCheck className="w-5 h-5 text-[#009EE3] shrink-0" /><div className="text-left"><span className="text-xs font-bold block text-[#005B8F]">Checkout Pro</span><span className="text-[10px] text-[#795344]">Mercado Pago (PIX/Cartão)</span></div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* BOTÃO PIX DIRETO */}
+                        <button
+                          type="button"
+                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pix' })}
+                          className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
+                            checkoutData.paymentMethod === 'pix'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2] shadow-sm'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#A90F4D]/50'
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-xs">
+                            <QrCode className="w-5 h-5 text-[#A90F4D]" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-xs font-bold block text-[#4A2532]">PIX Instantâneo</span>
+                            <span className="text-[10px] text-emerald-700 font-semibold">Aprovação na hora (Recomendado)</span>
+                          </div>
                         </button>
-                        <button type="button" onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pix' })} className={`p-3 rounded-2xl border flex items-center gap-2 ${checkoutData.paymentMethod === 'pix' ? 'border-[#A90F4D] bg-[#FCEEF2]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
-                          <QrCode className="w-5 h-5 text-[#A90F4D] shrink-0" /><span className="text-xs font-bold">PIX com QR Code</span>
-                        </button>
-                        <button type="button" onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'card' })} className={`p-3 rounded-2xl border flex items-center gap-2 ${checkoutData.paymentMethod === 'card' ? 'border-[#A90F4D] bg-[#FCEEF2]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
-                          <CreditCard className="w-5 h-5 text-[#A90F4D] shrink-0" /><span className="text-xs font-bold">Cartão de Crédito</span>
+
+                        {/* BOTÃO CARTÃO (CHECKOUT PRO) */}
+                        <button
+                          type="button"
+                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'mercadopago' })}
+                          className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
+                            checkoutData.paymentMethod === 'mercadopago'
+                              ? 'border-[#009EE3] bg-[#F0F9FF] shadow-sm'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#009EE3]/50'
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-xs">
+                            <CreditCard className="w-5 h-5 text-[#009EE3]" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-xs font-bold block text-[#005B8F]">Cartão de Crédito</span>
+                            <span className="text-[10px] text-[#795344]">Checkout Seguro Mercado Pago</span>
+                          </div>
                         </button>
                       </div>
-                      {checkoutData.paymentMethod === 'card' && (
-                        <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] space-y-2.5 animate-fadeIn">
-                          <p className="text-[11px] font-bold text-[#A90F4D] flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" />Dados do Cartão (Ambiente Demonstrativo Seguro)</p>
-                          <input type="text" required value={checkoutData.cardNumber} onChange={(e) => setCheckoutData({ ...checkoutData, cardNumber: e.target.value })} placeholder="Número do Cartão (0000 0000 0000 0000) *" className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs" />
-                          <div className="grid grid-cols-3 gap-2">
-                            <input type="text" required value={checkoutData.cardHolder} onChange={(e) => setCheckoutData({ ...checkoutData, cardHolder: e.target.value })} placeholder="Nome no Cartão *" className="col-span-1 px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs" />
-                            <input type="text" required value={checkoutData.cardExpiry} onChange={(e) => setCheckoutData({ ...checkoutData, cardExpiry: e.target.value })} placeholder="MM/AA *" className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs" />
-                            <input type="text" required value={checkoutData.cardCvv} onChange={(e) => setCheckoutData({ ...checkoutData, cardCvv: e.target.value })} placeholder="CVV *" className="px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs" />
-                          </div>
-                        </div>
-                      )}
+
                       <button type="submit" disabled={isSubmittingCheckout} className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 ${checkoutData.paymentMethod === 'mercadopago' ? 'bg-[#009EE3] hover:bg-[#0082BD]' : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'}`}>
-                        {isSubmittingCheckout ? 'Salvando pedido e conectando ao Mercado Pago...' : checkoutData.paymentMethod === 'mercadopago' ? `Pagar com Checkout Pro Mercado Pago • ${formatBRL(cartTotal)}` : checkoutData.paymentMethod === 'pix' ? `Gerar QR Code PIX • ${formatBRL(cartTotal)}` : `Pagar com Cartão • ${formatBRL(cartTotal)}`}
+                        {isSubmittingCheckout ? 'Salvando pedido e conectando...' : checkoutData.paymentMethod === 'mercadopago' ? `Pagar com Cartão • ${formatBRL(cartTotal)}` : `Gerar QR Code PIX • ${formatBRL(cartTotal)}`}
                       </button>
                     </div>
                   </form>
