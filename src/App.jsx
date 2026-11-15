@@ -914,6 +914,54 @@ const CategoryIconSVG = ({ type }) => {
 const formatBRL = (value) =>
   Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Gerador de Payload PIX (Padrão BR Code / Banco Central) com valor e chave configurada
+const generatePixCopyPaste = (pixKey, merchantName, merchantCity, amount, txid = 'MIMOROSAS') => {
+  const cleanKey = (pixKey || 'mimorosas@pix.com.br').trim();
+  const cleanName = (merchantName || 'MIMO ROSAS')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .substring(0, 25)
+    .toUpperCase();
+  const cleanCity = (merchantCity || 'GRAMADO')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .substring(0, 15)
+    .toUpperCase();
+  const valStr = Number(amount || 0).toFixed(2);
+
+  const f = (id, val) => `${id}${String(val.length).padStart(2, '0')}${val}`;
+  const gui = f('00', 'br.gov.bcb.pix') + f('01', cleanKey);
+  const merchantAccount = f('26', gui);
+  const additionalData = f('62', f('05', txid));
+
+  const payload =
+    '000201' +
+    merchantAccount +
+    '52040000' +
+    '5303986' +
+    f('54', valStr) +
+    '5802BR' +
+    f('59', cleanName) +
+    f('60', cleanCity) +
+    additionalData +
+    '6304';
+
+  // Cálculo CRC16-CCITT (0xFFFF)
+  let crc = 0xffff;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+    }
+  }
+  const crcHex = (crc & 0xffff).toString(16).toUpperCase().padStart(4, '0');
+  return payload + crcHex;
+};
+
 // ============================================================================
 // COMPONENTE PRINCIPAL (VITRINE + PAINEL ADMIN + SUPABASE INTEGRADO)
 // ============================================================================
@@ -991,8 +1039,11 @@ export default function App() {
         ? JSON.parse(saved)
         : {
             whatsappNumber: '5554999999999',
+            pixKey: '5554999999999',
+            pixHolderName: 'Mimo Rosas Artesanal',
             freeShippingMin: 120,
             defaultShippingFee: 14.9,
+            hideTopAdminBar: false,
             assistantGreeting:
               'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
             adminPassword: 'mimo2026'
@@ -1000,8 +1051,11 @@ export default function App() {
     } catch {
       return {
         whatsappNumber: '5554999999999',
+        pixKey: '5554999999999',
+        pixHolderName: 'Mimo Rosas Artesanal',
         freeShippingMin: 120,
         defaultShippingFee: 14.9,
+        hideTopAdminBar: false,
         assistantGreeting:
           'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
         adminPassword: 'mimo2026'
@@ -1911,12 +1965,38 @@ export default function App() {
     // 3. Salva o pedido diretamente no Supabase
     await syncNewOrderToSupabase(newOrder);
 
+    const pixCode = generatePixCopyPaste(
+      storeConfig.pixKey || storeConfig.whatsappNumber,
+      storeConfig.pixHolderName || 'MIMO ROSAS',
+      'BRASIL',
+      cartTotal,
+      code.replace(/[^A-Z0-9]/g, '')
+    );
+
+    const itemsSummaryText = newOrder.items
+      .map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`)
+      .join('\n');
+
+    const waMessage =
+      `Olá Mimo Rosas! 🌹 Acabei de fazer o pedido *${code}* no site:\n\n` +
+      `*Cliente:* ${checkoutData.name}\n` +
+      `*Telefone:* ${checkoutData.phone}\n` +
+      `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
+      `*Pagamento:* ${checkoutData.paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}\n\n` +
+      `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
+      `*Total:* ${formatBRL(cartTotal)}`;
+
     setOrderSuccess({
       code,
       customer: checkoutData.name,
       total: cartTotal,
       method: checkoutData.paymentMethod,
-      delivery: checkoutData.deliveryMethod
+      delivery: checkoutData.deliveryMethod,
+      pixCode,
+      whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(
+        /\D/g,
+        ''
+      )}?text=${encodeURIComponent(waMessage)}`
     });
     setCart([]);
   };
@@ -2116,48 +2196,50 @@ export default function App() {
         }
       `}</style>
 
-      {/* BARRA DE MODO (ALTERNAR ENTRE VITRINE E PAINEL ADMIN) */}
-      <div className="w-full bg-[#3A1C28] text-[#FFF9F3] px-3 py-1.5 text-xs flex items-center justify-between z-50 border-b border-[#A90F4D]/30">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              sbStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-            }`}
-          />
-          <span className="font-medium truncate">
-            Mimo Rosas •{' '}
-            <span className="opacity-80 hidden sm:inline">
-              {sbStatus.connected ? 'Supabase Conectado' : 'Loja + Sistema Admin'}
+      {/* BARRA DE MODO (PODE SER OCULTADA PARA CLIENTES QUANDO EM PRODUÇÃO) */}
+      {(!storeConfig.hideTopAdminBar || appMode === 'admin' || isAdminUnlocked) && (
+        <div className="w-full bg-[#3A1C28] text-[#FFF9F3] px-3 py-1.5 text-xs flex items-center justify-between z-50 border-b border-[#A90F4D]/30">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                sbStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <span className="font-medium truncate">
+              Mimo Rosas •{' '}
+              <span className="opacity-80 hidden sm:inline">
+                {sbStatus.connected ? 'Supabase Conectado' : 'Loja + Sistema Admin'}
+              </span>
             </span>
-          </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAppMode('store')}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
+                appMode === 'store'
+                  ? 'bg-[#A90F4D] text-white shadow-xs'
+                  : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              <span>Vitrine (Loja)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAppMode('admin')}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
+                appMode === 'admin'
+                  ? 'bg-[#A90F4D] text-white shadow-xs'
+                  : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
+              }`}
+            >
+              <Settings className="w-3 h-3" />
+              <span>Painel Admin ({orders.length})</span>
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setAppMode('store')}
-            className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
-              appMode === 'store'
-                ? 'bg-[#A90F4D] text-white shadow-xs'
-                : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
-            }`}
-          >
-            <Eye className="w-3 h-3" />
-            <span>Vitrine (Loja)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setAppMode('admin')}
-            className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
-              appMode === 'admin'
-                ? 'bg-[#A90F4D] text-white shadow-xs'
-                : 'bg-white/10 text-[#F6E9E5] hover:bg-white/20'
-            }`}
-          >
-            <Settings className="w-3 h-3" />
-            <span>Painel Admin ({orders.length})</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* =====================================================================
           MODO 2: PAINEL ADMINISTRATIVO INTEGRADO (COM SENHA PARA VERCEL)
@@ -2415,86 +2497,16 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            )}
-
-            {/* ABA 2: PEDIDOS RECEBIDOS */}
-            {adminTab === 'orders' && (
-              <div className="space-y-3.5">
-                <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0]">
-                  <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                    Central de Pedidos
-                  </h2>
-                  <p className="text-xs text-[#795344]">
-                    Quando um cliente finaliza uma compra no Checkout da Loja, o pedido entra aqui e na tabela <code>orders</code> do seu Supabase.
-                  </p>
-                </div>
-
-                {orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0] space-y-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F2DFDA] pb-2.5">
-                      <div>
-                        <span className="text-xs font-bold text-[#A90F4D]">{order.id}</span>
-                        <span className="text-xs text-[#795344] ml-2">• {order.createdAt}</span>
-                        <h3 className="font-bold text-sm text-[#4A2532] mt-0.5">
-                          {order.customerName} — {order.phone}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#F6E9E5] text-[#A90F4D] border border-[#DFC3BC]"
-                        >
-                          <option value="Aguardando PIX">Aguardando PIX</option>
-                          <option value="Pago">Pago</option>
-                          <option value="Em Produção">Em Produção</option>
-                          <option value="Enviado">Enviado</option>
-                          <option value="Concluído">Concluído</option>
-                        </select>
-                        <a
-                          href={`https://wa.me/55${order.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                            `Olá ${order.customerName}! 🌹 Aqui é da Mimo Rosas sobre seu pedido ${order.id} (${order.status}).`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1.5 rounded-full bg-[#25D366] text-white text-xs font-semibold"
-                        >
-                          Chamar no WhatsApp
-                        </a>
-                      </div>
-                    </div>
-
-                    <div className="text-xs text-[#795344] space-y-1">
-                      <p>
-                        <strong>Entrega:</strong> {order.address} ({order.cep})
-                      </p>
-                      <p>
-                        <strong>Itens:</strong>{' '}
-                        {order.items.map((i) => `${i.qty}x ${i.name}`).join(' | ')}
-                      </p>
-                      <p className="text-sm font-bold text-[#A90F4D] pt-1">
-                        Total do Pedido: {formatBRL(order.total)} ({order.paymentMethod.toUpperCase()})
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ABA 3: CONFIGURAÇÃO DA IA VENDEDORA & LOJA */}
+            {/* ABA 3: CONFIGURAÇÃO DA IA VENDEDORA, PIX, WHATSAPP & LOJA */}
             {adminTab === 'assistant' && (
               <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-4">
                 <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                  Configurações da Assistente Virtual, Senha & Frete
+                  Configurações de WhatsApp, Chave PIX, Frete e Segurança
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                   <div>
                     <label className="block font-semibold mb-1">
-                      WhatsApp Oficial (com DDD)
+                      WhatsApp Oficial (com 55 + DDD)
                     </label>
                     <input
                       type="text"
@@ -2502,9 +2514,40 @@ export default function App() {
                       onChange={(e) =>
                         setStoreConfig({ ...storeConfig, whatsappNumber: e.target.value })
                       }
+                      placeholder="Ex: 5554999999999"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
                   </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Sua Chave PIX Oficial (CNPJ, CPF, E-mail ou Celular)
+                    </label>
+                    <input
+                      type="text"
+                      value={storeConfig.pixKey || ''}
+                      onChange={(e) =>
+                        setStoreConfig({ ...storeConfig, pixKey: e.target.value })
+                      }
+                      placeholder="Sua chave PIX para o Copia e Cola"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Nome do Recebedor PIX
+                    </label>
+                    <input
+                      type="text"
+                      value={storeConfig.pixHolderName || 'Mimo Rosas'}
+                      onChange={(e) =>
+                        setStoreConfig({ ...storeConfig, pixHolderName: e.target.value })
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                   <div>
                     <label className="block font-semibold mb-1">
                       Frete Grátis acima de (R$)
@@ -2516,6 +2559,23 @@ export default function App() {
                         setStoreConfig({
                           ...storeConfig,
                           freeShippingMin: Number(e.target.value)
+                        })
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">
+                      Valor do Frete Padrão (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.10"
+                      value={storeConfig.defaultShippingFee}
+                      onChange={(e) =>
+                        setStoreConfig({
+                          ...storeConfig,
+                          defaultShippingFee: Number(e.target.value)
                         })
                       }
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
@@ -2537,6 +2597,28 @@ export default function App() {
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9]"
                     />
                   </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-[#F6E9E5] border border-[#DFC3BC] text-xs flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-[#4A2532]">
+                      Modo Cliente Limpo (Esconder barra escura do topo para visitantes)
+                    </p>
+                    <p className="text-[11px] text-[#795344]">
+                      Quando ativado, clientes comuns não veem a barra do topo. Você sempre poderá abrir o painel pelo link <code>mimorosas.com.br/?admin=1</code> ou em <em>Minha Conta</em>.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(storeConfig.hideTopAdminBar)}
+                    onChange={(e) =>
+                      setStoreConfig({
+                        ...storeConfig,
+                        hideTopAdminBar: e.target.checked
+                      })
+                    }
+                    className="w-5 h-5 accent-[#A90F4D] shrink-0 cursor-pointer"
+                  />
                 </div>
                 <div className="text-xs">
                   <label className="block font-semibold mb-1">
@@ -3890,9 +3972,51 @@ export default function App() {
                     </h2>
                     <p className="text-xs text-[#795344] max-w-md mx-auto">
                       Obrigada, <strong>{orderSuccess.customer}</strong>! Seu pedido{' '}
-                      <strong className="text-[#A90F4D]">{orderSuccess.code}</strong> já foi salvo no Painel Administrativo e no banco Supabase.
+                      <strong className="text-[#A90F4D]">{orderSuccess.code}</strong> no valor de{' '}
+                      <strong>{formatBRL(orderSuccess.total)}</strong> foi registrado.
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+
+                    {orderSuccess.method === 'pix' && orderSuccess.pixCode && (
+                      <div className="bg-[#F6E9E5] p-4 rounded-2xl border border-[#DFC3BC] max-w-md mx-auto text-left space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-[#A90F4D] flex items-center gap-1.5">
+                            <QrCode className="w-4 h-4" />
+                            PIX Copia e Cola ({formatBRL(orderSuccess.total)})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              safeCopyText(orderSuccess.pixCode, 'Código PIX Copia e Cola')
+                            }
+                            className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1"
+                          >
+                            <Copy className="w-3 h-3" /> Copiar PIX
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          readOnly
+                          value={orderSuccess.pixCode}
+                          onClick={(e) => e.target.select()}
+                          className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[10px] text-[#4A2532]"
+                        />
+                        <p className="text-[11px] text-[#795344]">
+                          Chave PIX: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong>
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
+                      {orderSuccess.whatsappUrl && (
+                        <a
+                          href={orderSuccess.whatsappUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-6 py-3 rounded-full bg-[#25D366] hover:bg-[#1EBE5B] text-white text-xs font-bold shadow-md flex items-center justify-center gap-2"
+                        >
+                          <span>Enviar Pedido no WhatsApp da Loja →</span>
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -3902,17 +4026,6 @@ export default function App() {
                         className="px-6 py-2.5 rounded-full bg-[#A90F4D] text-white text-xs font-semibold"
                       >
                         Voltar para a Vitrine
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOrderSuccess(null);
-                          setAppMode('admin');
-                          setAdminTab('orders');
-                        }}
-                        className="px-6 py-2.5 rounded-full bg-[#FFF9F3] border border-[#A90F4D] text-[#A90F4D] text-xs font-semibold"
-                      >
-                        Ver Pedido no Painel Admin →
                       </button>
                     </div>
                   </div>
