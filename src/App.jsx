@@ -1088,44 +1088,9 @@ export default function App() {
         } catch (err) { console.error("Erro MP Pref:", err); }
       }
 
-      // ==========================================
-      // FLUXO 2: PIX DIRETO NA TELA
-      // ==========================================
-      if (checkoutData.paymentMethod === 'pix' && hasMpToken) {
-        try {
-          const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${activeMpToken}`,
-              'Content-Type': 'application/json',
-              'X-Idempotency-Key': `${code}-${Date.now()}`
-            },
-            body: JSON.stringify({
-              transaction_amount: Number(cartTotal.toFixed(2)),
-              description: `Pedido ${code} - Mimo Rosas`,
-              payment_method_id: 'pix',
-              external_reference: code,
-              payer: {
-                email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
-                first_name: checkoutData.name.split(' ')[0] || 'Cliente'
-              }
-            })
-          });
-          if (mpRes.ok) {
-            const mpData = await mpRes.json();
-            const txData = mpData?.point_of_interaction?.transaction_data;
-            if (txData?.qr_code) {
-              pixCode = txData.qr_code;
-              qrCodeUrl = txData.qr_code_base64
-                ? `data:image/png;base64,${txData.qr_code_base64}`
-                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
-              mpPaymentId = String(mpData.id);
-              newOrder.mpPaymentId = mpPaymentId;
-              await saveOrderToSupabase(newOrder);
-            }
-          }
-        } catch (err) { console.error("Erro MP Pix:", err); }
-      }
+      // FLUXO 2 (PIX DIRETO): A API do Mercado Pago bloqueia requisições POST via browser (CORS).
+      // Por isso, usamos o código PIX estático gerado acima, que é 100% seguro e funcional.
+      // O status será atualizado automaticamente via polling do Supabase.
 
       const itemsSummaryText = newOrder.items.map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`).join('\n');
       const waMessage =
@@ -1171,9 +1136,13 @@ export default function App() {
 
     const checkPayment = async () => {
       setPixCheckCount((c) => c + 1);
-      const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
-      if (mpCheck && mpCheck.status === 'approved') { await markOrderAsPaidAutomatically(); return; }
+      // 1. Verifica no Mercado Pago (GET, geralmente permitido)
+      try {
+        const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
+        if (mpCheck && mpCheck.status === 'approved') { await markOrderAsPaidAutomatically(); return; }
+      } catch (e) { /* ignora erro CORS do MP */ }
 
+      // 2. Verifica no Supabase (Para quando o Admin marca como "Pago")
       if (supabaseUrl && supabaseKey) {
         try {
           const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
@@ -1185,6 +1154,7 @@ export default function App() {
         } catch { /* ignora */ }
       }
 
+      // 3. Simulador de testes (Se ativado no admin)
       const demoSecs = Number(storeConfig.autoApproveDemoSeconds || 0);
       if (demoSecs > 0) {
         setPixCheckCount((currentCount) => { if (currentCount * 3 >= demoSecs) markOrderAsPaidAutomatically(); return currentCount; });
@@ -1563,7 +1533,7 @@ export default function App() {
                     <div>
                       <label className="block font-semibold mb-1 text-[#4A2532]">Access Token Mercado Pago (Obrigatório)</label>
                       <input type="password" value={storeConfig.mercadoPagoAccessToken || ''} onChange={(e) => setStoreConfig({ ...storeConfig, mercadoPagoAccessToken: e.target.value })} placeholder="APP_USR-0000000000000000-..." className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[11px]" />
-                      <p className="text-[10.5px] text-[#795344] mt-1">Quando preenchido, o site gera o PIX e o Checkout de Cartão nativos.</p>
+                      <p className="text-[10.5px] text-[#795344] mt-1">Quando preenchido, o site gera o Checkout de Cartão nativo.</p>
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-[#4A2532]">Tempo de Auto-Confirmação p/ Testes (0 = Desativado)</label>
@@ -2114,9 +2084,29 @@ export default function App() {
                             </div>
                             <div className="pt-2 border-t border-[#E5CFC9]">
                               <button 
-                                onClick={() => {
-                                  window.dispatchEvent(new Event('focus'));
+                                onClick={async () => {
                                   showAdminToast('Verificando pagamento...');
+                                  if (supabaseUrl && supabaseKey) {
+                                    try {
+                                      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+                                      const res = await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderSuccess.code)}&select=status`, { headers: sbHeaders() });
+                                      if (res.ok) {
+                                        const rows = await res.json();
+                                        if (Array.isArray(rows) && rows[0]?.status === 'Pago') {
+                                          await markOrderAsPaidAutomatically();
+                                          showAdminToast('Pagamento Confirmado!');
+                                          return;
+                                        }
+                                      }
+                                    } catch (e) {}
+                                  }
+                                  const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
+                                  if (mpCheck && mpCheck.status === 'approved') {
+                                     await markOrderAsPaidAutomatically();
+                                     showAdminToast('Pagamento Confirmado!');
+                                  } else {
+                                     showAdminToast('Ainda não identificamos o pagamento. Aguarde alguns minutos.');
+                                  }
                                 }}
                                 className="w-full py-3 px-4 rounded-2xl bg-[#FFF9F3] hover:bg-white border border-[#DFC3BC] text-[#4A2532] text-xs font-semibold flex items-center justify-center gap-2.5 shadow-2xs transition-colors cursor-pointer"
                               >
