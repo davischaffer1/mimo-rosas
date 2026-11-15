@@ -2497,6 +2497,100 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* ABA 2: CENTRAL DE PEDIDOS */}
+            {adminTab === 'orders' && (
+              <div className="space-y-4">
+                <div className="bg-[#FFF9F3] p-4 rounded-2xl border border-[#EAD6D0] flex items-center justify-between">
+                  <div>
+                    <h2 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                      Pedidos Recebidos ({orders.length})
+                    </h2>
+                    <p className="text-xs text-[#795344]">
+                      Acompanhe os pedidos feitos no Checkout e avise o cliente pelo WhatsApp.
+                    </p>
+                  </div>
+                </div>
+
+                {orders.length === 0 ? (
+                  <div className="bg-[#FFF9F3] p-8 rounded-2xl border border-[#EAD6D0] text-center text-xs text-[#795344]">
+                    Nenhum pedido registrado ainda.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {orders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0] space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F2DFDA] pb-2.5">
+                          <div>
+                            <span className="text-xs font-bold text-[#A90F4D]">
+                              Pedido #{order.id}
+                            </span>
+                            <span className="text-[11px] text-[#795344] ml-2">
+                              • {order.createdAt}
+                            </span>
+                            <h3 className="font-serif-display font-bold text-base text-[#4A2532]">
+                              {order.customerName} ({order.phone})
+                            </h3>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={order.status}
+                              onChange={(e) =>
+                                handleUpdateOrderStatus(order.id, e.target.value)
+                              }
+                              className="px-3 py-1.5 rounded-full bg-[#F6E9E5] border border-[#DFC3BC] text-xs font-bold text-[#4A2532]"
+                            >
+                              <option value="Pendente">Pendente</option>
+                              <option value="Aguardando PIX">Aguardando PIX</option>
+                              <option value="Pago">Pago</option>
+                              <option value="Em Produção">Em Produção</option>
+                              <option value="Enviado">Enviado</option>
+                              <option value="Concluído">Concluído</option>
+                            </select>
+
+                            <a
+                              href={`https://wa.me/55${(order.phone || '').replace(
+                                /\D/g,
+                                ''
+                              )}?text=${encodeURIComponent(
+                                `Olá ${order.customerName}! 🌹 Aqui é da Mimo Rosas sobre o seu pedido ${order.id} (${order.status}).`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-full bg-[#25D366] text-white text-xs font-semibold"
+                            >
+                              Chamar WhatsApp
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-[#5A382E] space-y-1">
+                          <p>
+                            <strong>Entrega:</strong> {order.address} (CEP: {order.cep})
+                          </p>
+                          <p>
+                            <strong>Itens:</strong>{' '}
+                            {(order.items || [])
+                              .map((i) => `${i.qty}x ${i.name}`)
+                              .join(', ')}
+                          </p>
+                          <p className="text-sm font-bold text-[#A90F4D] pt-1">
+                            Total: {formatBRL(order.total)} (
+                            {order.paymentMethod?.toUpperCase()})
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ABA 3: CONFIGURAÇÃO DA IA VENDEDORA, PIX, WHATSAPP & LOJA */}
             {adminTab === 'assistant' && (
               <div className="bg-[#FFF9F3] rounded-3xl p-5 border border-[#EAD6D0] space-y-4">
