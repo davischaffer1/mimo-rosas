@@ -266,9 +266,9 @@ const CategoryIconSVG = ({ type }) => {
 
 const formatBRL = (value) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// Normaliza variações (aceita strings antigas ou objetos { name, image, price })
+// Normaliza variações (aceita strings antigas ou objetos { name, image, price }, ignorando o item de metadados __mimo_meta__)
 const normalizeVariationItem = (v) => {
-  if (!v) return { name: 'Padrão', image: '', price: '' };
+  if (!v || v.__mimo_meta__) return null;
   if (typeof v === 'string') return { name: v.trim() || 'Padrão', image: '', price: '' };
   return {
     name: String(v.name || v.label || 'Padrão').trim(),
@@ -283,8 +283,118 @@ const normalizeVariationsList = (variations) => {
   }
   const list = variations
     .map(normalizeVariationItem)
-    .filter((item) => item.name.length > 0);
+    .filter((item) => item && item.name.length > 0);
   return list.length > 0 ? list : [{ name: 'Padrão', image: '', price: '' }];
+};
+
+// Extrai as configurações de Personalização e Grupos de Combinação (ex: Decoração / Enfeite ao redor)
+const DEFAULT_CUSTOMIZATION = {
+  enabled: false,
+  askInitial: true,
+  askName: true,
+  askNotes: false,
+  required: true,
+  promptLabel: 'Informe a letra inicial e/ou o nome para personalizar sua peça:',
+  addonGroups: []
+};
+
+const extractProductCustomization = (productOrVariations) => {
+  if (!productOrVariations) return { ...DEFAULT_CUSTOMIZATION, addonGroups: [] };
+  if (productOrVariations.customization && typeof productOrVariations.customization === 'object') {
+    const c = productOrVariations.customization;
+    return {
+      ...DEFAULT_CUSTOMIZATION,
+      ...c,
+      addonGroups: Array.isArray(c.addonGroups) ? c.addonGroups : []
+    };
+  }
+  const arr = Array.isArray(productOrVariations)
+    ? productOrVariations
+    : (Array.isArray(productOrVariations.variations) ? productOrVariations.variations : []);
+  const meta = arr.find((item) => item && typeof item === 'object' && item.__mimo_meta__ === true);
+  if (!meta) {
+    // Ativa por padrão no chaveiro de inicial do catálogo demonstrativo
+    if (productOrVariations?.id === 'prod-7') {
+      return {
+        ...DEFAULT_CUSTOMIZATION,
+        enabled: true,
+        askInitial: true,
+        askName: true,
+        required: true,
+        addonGroups: [
+          {
+            id: 'grp-decor',
+            title: 'Decoração / Enfeite ao redor',
+            options: [
+              { name: 'Pétalas Naturais + Folha de Ouro', image: '', extraPrice: '' },
+              { name: 'Pérolas + Mini Rosas Brancas', image: '', extraPrice: '' },
+              { name: 'Glitter Rosé + Borboleta', image: '', extraPrice: '' }
+            ]
+          }
+        ]
+      };
+    }
+    return { ...DEFAULT_CUSTOMIZATION, addonGroups: [] };
+  }
+  return {
+    enabled: Boolean(meta.enabled),
+    askInitial: meta.askInitial !== false,
+    askName: meta.askName !== false,
+    askNotes: Boolean(meta.askNotes),
+    required: meta.required !== false,
+    promptLabel: String(meta.promptLabel || DEFAULT_CUSTOMIZATION.promptLabel),
+    addonGroups: Array.isArray(meta.addonGroups)
+      ? meta.addonGroups.map((g, gIdx) => ({
+          id: g.id || `grp-${gIdx}`,
+          title: String(g.title || 'Decoração / Enfeite').trim(),
+          options: Array.isArray(g.options)
+            ? g.options
+                .map((o) => ({
+                  name: String(o?.name || '').trim(),
+                  image: String(o?.image || '').trim(),
+                  extraPrice: o?.extraPrice !== undefined && o?.extraPrice !== null && o?.extraPrice !== '' ? Number(o.extraPrice) : ''
+                }))
+                .filter((o) => o.name.length > 0)
+            : []
+        }))
+      : []
+  };
+};
+
+const packVariationsWithMeta = (variationItems, customization) => {
+  const cleanVars = normalizeVariationsList(variationItems);
+  if (!customization) return cleanVars;
+  const cleanGroups = (Array.isArray(customization.addonGroups) ? customization.addonGroups : [])
+    .map((g, idx) => ({
+      id: g.id || `grp-${idx}`,
+      title: String(g.title || 'Decoração / Enfeite ao redor').trim(),
+      options: (Array.isArray(g.options) ? g.options : [])
+        .map((o) => ({
+          name: String(o?.name || '').trim(),
+          image: String(o?.image || '').trim(),
+          extraPrice: o?.extraPrice !== undefined && o?.extraPrice !== null && o?.extraPrice !== '' && Number(o.extraPrice) > 0
+            ? Number(String(o.extraPrice).replace(',', '.'))
+            : ''
+        }))
+        .filter((o) => o.name.length > 0)
+    }))
+    .filter((g) => g.title.length > 0 && g.options.length > 0);
+
+  const hasCustom = Boolean(customization.enabled) || cleanGroups.length > 0;
+  if (!hasCustom) return cleanVars;
+  return [
+    ...cleanVars,
+    {
+      __mimo_meta__: true,
+      enabled: Boolean(customization.enabled),
+      askInitial: customization.askInitial !== false,
+      askName: customization.askName !== false,
+      askNotes: Boolean(customization.askNotes),
+      required: customization.required !== false,
+      promptLabel: String(customization.promptLabel || DEFAULT_CUSTOMIZATION.promptLabel).trim(),
+      addonGroups: cleanGroups
+    }
+  ];
 };
 
 const getVariationName = (v) => (typeof v === 'string' ? v : (v?.name || 'Padrão'));
@@ -424,6 +534,8 @@ export default function App() {
   const [productQty, setProductQty] = useState(1);
   const [selectedVariation, setSelectedVariation] = useState('');
   const [selectedVariationImage, setSelectedVariationImage] = useState('');
+  const [unitConfigs, setUnitConfigs] = useState([]);
+  const [productCustomError, setProductCustomError] = useState('');
   const [activeGalleryIdx, setActiveGalleryIdx] = useState(0);
 
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
@@ -440,6 +552,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVariationIndex, setUploadingVariationIndex] = useState(null);
+  const [uploadingAddonTarget, setUploadingAddonTarget] = useState(null);
   const [galleryPickerVarIdx, setGalleryPickerVarIdx] = useState(null);
   const [showManualUrlInput, setShowManualUrlInput] = useState(false);
   const [adminProductSearch, setAdminProductSearch] = useState('');
@@ -707,6 +820,24 @@ export default function App() {
               gallery: nextGallery,
               variationItems: nextVars,
               variations: nextVars
+            };
+          }
+          if (target && typeof target === 'object' && target.type === 'addon') {
+            const { groupIndex, optionIndex } = target;
+            const currCustom = prev.customization || extractProductCustomization(prev);
+            const nextGroups = (currCustom.addonGroups || []).map((grp, gI) => {
+              if (gI !== groupIndex) return grp;
+              return {
+                ...grp,
+                options: (grp.options || []).map((opt, oI) => (oI === optionIndex ? { ...opt, image: finalImageUrl } : opt))
+              };
+            });
+            const nextGallery = currentGallery.includes(finalImageUrl) ? currentGallery : [...currentGallery, finalImageUrl];
+            return {
+              ...prev,
+              image: prev.image || finalImageUrl,
+              gallery: nextGallery,
+              customization: { ...currCustom, addonGroups: nextGroups }
             };
           }
           if (target === 'main') {
@@ -1168,6 +1299,25 @@ export default function App() {
   // ============================================================================
   // FUNÇÕES DA LOJA
   // ============================================================================
+  const buildDefaultUnitConfig = (product, preferredVariation = '') => {
+    const vars = normalizeVariationsList(product?.variations);
+    const firstVar = vars.find((v) => v.name === preferredVariation) || vars[0] || { name: 'Padrão', image: '', price: '' };
+    const custom = extractProductCustomization(product);
+    const defaultAddons = {};
+    (custom.addonGroups || []).forEach((grp) => {
+      if (grp.options && grp.options[0]) {
+        defaultAddons[grp.title] = grp.options[0].name;
+      }
+    });
+    return {
+      variation: firstVar.name,
+      addons: defaultAddons,
+      initial: '',
+      customName: '',
+      notes: ''
+    };
+  };
+
   const openProductDetail = (product) => {
     const vars = normalizeVariationsList(product?.variations);
     const firstVar = vars[0] || { name: 'Padrão', image: '', price: '' };
@@ -1175,6 +1325,8 @@ export default function App() {
     setProductQty(1);
     setSelectedVariation(firstVar.name);
     setSelectedVariationImage(firstVar.image || '');
+    setUnitConfigs([buildDefaultUnitConfig(product, firstVar.name)]);
+    setProductCustomError('');
     setActiveGalleryIdx(0);
     setActiveView('product');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1201,8 +1353,84 @@ export default function App() {
       try { localStorage.setItem('mimo_rosas_favs_owner', 'guest'); } catch { /* ignora */ }
     }
   };
-  const addToCart = (product, qty = 1, variation = null, e = null) => {
+  const addToCart = (product, qty = 1, variation = null, e = null, customUnits = null) => {
     if (e) e.stopPropagation();
+    const custom = extractProductCustomization(product);
+
+    // Se clicou no card da vitrine e o produto exige personalização ou escolha de decoração, abre a página do produto
+    if (e && (custom.enabled || (custom.addonGroups && custom.addonGroups.length > 0))) {
+      openProductDetail(product);
+      return;
+    }
+
+    // Se veio da tela de detalhes com unidades configuradas (ex: múltiplas unidades ou personalização/combinações)
+    if (Array.isArray(customUnits) && customUnits.length > 0) {
+      setCart((prev) => {
+        let nextCart = [...prev];
+        customUnits.forEach((u) => {
+          const varObj = findVariationObj(product, u.variation);
+          let unitPrice = varObj?.price !== '' && varObj?.price !== null && Number(varObj?.price) > 0
+            ? Number(varObj.price)
+            : Number(product.price || 0);
+          let unitImage = varObj?.image || product.image;
+
+          const parts = [varObj.name];
+          (custom.addonGroups || []).forEach((grp) => {
+            const chosenOptName = u.addons?.[grp.title] || grp.options?.[0]?.name;
+            if (chosenOptName) {
+              parts.push(`${grp.title}: ${chosenOptName}`);
+              const optObj = (grp.options || []).find((o) => o.name === chosenOptName);
+              if (optObj?.extraPrice && Number(optObj.extraPrice) > 0) {
+                unitPrice += Number(optObj.extraPrice);
+              }
+              if (optObj?.image && !varObj?.image) {
+                unitImage = optObj.image;
+              }
+            }
+          });
+
+          if (custom.enabled) {
+            if (custom.askInitial && String(u.initial || '').trim()) {
+              parts.push(`Inicial: ${String(u.initial).trim().toUpperCase()}`);
+            }
+            if (custom.askName && String(u.customName || '').trim()) {
+              parts.push(`Nome: ${String(u.customName).trim()}`);
+            }
+            if (custom.askNotes && String(u.notes || '').trim()) {
+              parts.push(`Obs: ${String(u.notes).trim()}`);
+            }
+          }
+
+          const fullVariationLabel = parts.join(' • ');
+          const cartKey = `${product.id}__${fullVariationLabel}`;
+          const existing = nextCart.find((i) => i.cartKey === cartKey);
+          if (existing) {
+            nextCart = nextCart.map((i) => (
+              i.cartKey === cartKey
+                ? { ...i, quantity: i.quantity + 1, price: unitPrice, image: unitImage }
+                : i
+            ));
+          } else {
+            nextCart.push({
+              cartKey,
+              id: product.id,
+              name: product.name,
+              price: unitPrice,
+              image: unitImage,
+              variation: fullVariationLabel,
+              quantity: 1
+            });
+          }
+        });
+        return nextCart;
+      });
+      setAddedFeedbackId(product.id);
+      setCartBounce(true);
+      setTimeout(() => setAddedFeedbackId(null), 1100);
+      setTimeout(() => setCartBounce(false), 600);
+      return;
+    }
+
     const chosenName = typeof variation === 'string' && variation
       ? variation
       : getVariationName(variation || product.variations?.[0]);
@@ -1649,13 +1877,20 @@ export default function App() {
       ? cleanedVariations
       : [{ name: 'Padrão', image: '', price: '' }];
 
+    const customCfg = editingProduct.customization || extractProductCustomization(editingProduct);
+    const addonImages = (customCfg.addonGroups || [])
+      .flatMap((g) => (g.options || []).map((o) => o.image))
+      .filter(Boolean);
+
     const baseGallery = Array.isArray(editingProduct.gallery) && editingProduct.gallery.length > 0
       ? editingProduct.gallery.filter(Boolean)
       : [editingProduct.image].filter(Boolean);
-    // Garante que fotos de variações também fiquem disponíveis na galeria do produto
+    // Garante que fotos de variações e decorações também fiquem disponíveis na galeria do produto
     const varImages = finalVariations.map((v) => v.image).filter(Boolean);
-    const cleanGallery = Array.from(new Set([...baseGallery, ...varImages]));
+    const cleanGallery = Array.from(new Set([...baseGallery, ...varImages, ...addonImages]));
     const mainImg = editingProduct.image || cleanGallery[0] || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85';
+
+    const packedVariations = packVariationsWithMeta(finalVariations, customCfg);
 
     const formattedProduct = {
       ...editingProduct,
@@ -1665,7 +1900,8 @@ export default function App() {
       active: editingProduct.active !== false,
       image: mainImg,
       gallery: cleanGallery.length > 0 ? cleanGallery : [mainImg],
-      variations: finalVariations
+      variations: packedVariations,
+      customization: customCfg
     };
     delete formattedProduct.variationItems;
     delete formattedProduct.variationsText;
@@ -1741,7 +1977,13 @@ export default function App() {
             )}
           </div>
           <button type="button" onClick={(e) => addToCart(product, 1, null, e)} className={`mt-2.5 w-full py-2.5 px-3 rounded-full text-[12px] sm:text-[13px] font-medium flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 ${isAdded ? 'bg-[#2E7D32] text-white' : 'bg-[#A90F4D] hover:bg-[#8E0B3F] text-white'}`}>
-            {isAdded ? (<><Check className="w-4 h-4 stroke-[2.5]" /><span>Adicionado!</span></>) : (<><ShoppingCart className="w-3.5 h-3.5" /><span>Adicionar ao carrinho</span></>)}
+            {isAdded ? (
+              <><Check className="w-4 h-4 stroke-[2.5]" /><span>Adicionado!</span></>
+            ) : (extractProductCustomization(product).enabled || extractProductCustomization(product).addonGroups?.length > 0) ? (
+              <><Sparkles className="w-3.5 h-3.5" /><span>Personalizar / Escolher</span></>
+            ) : (
+              <><ShoppingCart className="w-3.5 h-3.5" /><span>Adicionar ao carrinho</span></>
+            )}
           </button>
         </div>
       </div>
@@ -2323,6 +2565,14 @@ export default function App() {
                 variationItems: nextList,
                 variations: nextList
               }));
+              const customCfg = editingProduct.customization || extractProductCustomization(editingProduct);
+              const updateCustomCfg = (patch) => setEditingProduct((prev) => {
+                const curr = prev.customization || extractProductCustomization(prev);
+                return { ...prev, customization: { ...curr, ...patch } };
+              });
+              const addonGroups = Array.isArray(customCfg.addonGroups) ? customCfg.addonGroups : [];
+              const updateAddonGroups = (nextGroups) => updateCustomCfg({ addonGroups: nextGroups });
+
               const badgeSuggestions = ['', 'Novo', 'Mais Vendido', 'Artesanal', 'Exclusivo', 'Personalizável', 'Presenteável', 'Edição Especial'];
               const galleryList = Array.isArray(editingProduct.gallery) && editingProduct.gallery.length > 0
                 ? editingProduct.gallery.filter(Boolean)
@@ -2345,7 +2595,7 @@ export default function App() {
                             {editingProduct.isNew ? 'Cadastrar Novo Produto' : 'Editar Produto'}
                           </h3>
                           <p className="text-[11px] text-[#795344]">
-                            Configure fotos, variações com imagens próprias, preços e estoque.
+                            Configure fotos, variações, combinações de enfeite/decoração e personalização por unidade.
                           </p>
                         </div>
                       </div>
@@ -2358,7 +2608,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Input oculto para upload de foto de variação */}
+                    {/* Input oculto para upload de foto de variação ou de opção de decoração */}
                     <input
                       ref={variationImageInputRef}
                       type="file"
@@ -2366,8 +2616,17 @@ export default function App() {
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file && uploadingVariationIndex !== null) {
-                          uploadProductPhoto(file, { type: 'variation', index: uploadingVariationIndex });
+                        if (file) {
+                          if (uploadingAddonTarget) {
+                            uploadProductPhoto(file, {
+                              type: 'addon',
+                              groupIndex: uploadingAddonTarget.groupIndex,
+                              optionIndex: uploadingAddonTarget.optionIndex
+                            });
+                            setUploadingAddonTarget(null);
+                          } else if (uploadingVariationIndex !== null) {
+                            uploadProductPhoto(file, { type: 'variation', index: uploadingVariationIndex });
+                          }
                         }
                         e.target.value = '';
                       }}
@@ -2887,9 +3146,308 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* SEÇÃO 4: Descrição */}
+                      {/* SEÇÃO 3.1: Combinações Extras (Ex: Decoração / Enfeite ao redor, Tassel, Ferragem) */}
+                      <div className="bg-white/90 rounded-2xl p-4 border-2 border-[#EAD6D0] space-y-3.5 shadow-2xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-bold text-[#4A2532] uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-[#A90F4D]" />4. Combinações Extras (Decoração / Enfeite ao redor / Acabamento)
+                            </span>
+                            <p className="text-[11px] text-[#795344] mt-0.5">
+                              Use quando a cliente puder combinar a variação principal (ex: Chaveiro Azul ou Preto) com uma decoração/enfeite ao redor!
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateAddonGroups([
+                              ...addonGroups,
+                              {
+                                id: `grp-${Date.now()}`,
+                                title: 'Decoração / Enfeite ao redor',
+                                options: [
+                                  { name: 'Pétalas + Folha de Ouro', image: '', extraPrice: '' },
+                                  { name: 'Pérolas + Rosas Brancas', image: '', extraPrice: '' }
+                                ]
+                              }
+                            ])}
+                            className="px-3.5 py-2 rounded-full bg-[#FCEEF2] hover:bg-[#FAD4E0] text-[#A90F4D] border border-[#E5B8C7] text-[11px] font-semibold flex items-center gap-1 shrink-0 self-start sm:self-auto"
+                          >
+                            <Plus className="w-3.5 h-3.5" />Adicionar Grupo de Escolha
+                          </button>
+                        </div>
+
+                        {/* Atalhos rápidos para criar grupos comuns */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10.5px] text-[#8B6456] font-medium">Criar grupo rápido:</span>
+                          {[
+                            { title: 'Decoração / Enfeite ao redor', opts: ['Pétalas + Folha de Ouro', 'Pérolas + Mini Rosas', 'Glitter Rosé + Borboleta'] },
+                            { title: 'Cor do Tassel / Pingente', opts: ['Tassel Rosa', 'Tassel Creme', 'Tassel Preto'] },
+                            { title: 'Cor da Ferragem / Argola', opts: ['Dourada', 'Rosé Gold', 'Prata'] }
+                          ].map((preset) => (
+                            <button
+                              key={preset.title}
+                              type="button"
+                              onClick={() => updateAddonGroups([
+                                ...addonGroups,
+                                {
+                                  id: `grp-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                                  title: preset.title,
+                                  options: preset.opts.map((name) => ({ name, image: '', extraPrice: '' }))
+                                }
+                              ])}
+                              className="px-2.5 py-1 rounded-full bg-[#F6E9E5] hover:bg-[#FCEEF2] text-[#5A382E] hover:text-[#A90F4D] border border-[#E5CFC9] text-[10.5px] font-medium transition-colors"
+                            >
+                              + {preset.title}
+                            </button>
+                          ))}
+                        </div>
+
+                        {addonGroups.length === 0 ? (
+                          <p className="text-[11px] text-[#9A7468] italic">
+                            Nenhum grupo extra adicionado. Clique em um dos botões acima se o produto tiver escolha de decoração/enfeite ao redor.
+                          </p>
+                        ) : (
+                          <div className="space-y-3">
+                            {addonGroups.map((grp, gIdx) => (
+                              <div key={grp.id || gIdx} className="p-3.5 rounded-2xl bg-[#FFF9F3] border border-[#DFC3BC] space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1">
+                                    <label className="block text-[10px] font-bold text-[#A90F4D] uppercase mb-0.5">
+                                      Título da Escolha Extra #{gIdx + 1}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="Ex: Decoração / Enfeite ao redor"
+                                      value={grp.title}
+                                      onChange={(e) => {
+                                        const next = addonGroups.map((g, i) => (i === gIdx ? { ...g, title: e.target.value } : g));
+                                        updateAddonGroups(next);
+                                      }}
+                                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#E5CFC9] text-xs font-bold text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateAddonGroups(addonGroups.filter((_, i) => i !== gIdx))}
+                                    className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-[10.5px] font-semibold flex items-center gap-1 mt-4"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />Remover grupo
+                                  </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {(grp.options || []).map((opt, oIdx) => (
+                                    <div key={oIdx} className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-white p-2.5 rounded-xl border border-[#EFE0DC]">
+                                      {/* Foto da opção de decoração */}
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-[#F6E9E5] border border-[#D4B2AA] shrink-0">
+                                          {opt.image ? (
+                                            <>
+                                              <img src={opt.image} alt={opt.name} className="w-full h-full object-cover" />
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const next = addonGroups.map((g, i) => (
+                                                    i === gIdx
+                                                      ? { ...g, options: g.options.map((o, j) => (j === oIdx ? { ...o, image: '' } : o)) }
+                                                      : g
+                                                  ));
+                                                  updateAddonGroups(next);
+                                                }}
+                                                className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-black/75 text-white text-[9px] flex items-center justify-center"
+                                              >
+                                                ×
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setUploadingAddonTarget({ groupIndex: gIdx, optionIndex: oIdx });
+                                                variationImageInputRef.current?.click();
+                                              }}
+                                              className="w-full h-full flex flex-col items-center justify-center text-[#A90F4D] hover:bg-[#FCEEF2] text-[8px] font-bold"
+                                              title="Enviar foto desta decoração"
+                                            >
+                                              <Camera className="w-3.5 h-3.5" />
+                                              <span>Foto</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <div className="sm:col-span-2">
+                                          <input
+                                            type="text"
+                                            placeholder="Ex: Pétalas Naturais + Folha de Ouro"
+                                            value={opt.name}
+                                            onChange={(e) => {
+                                              const next = addonGroups.map((g, i) => (
+                                                i === gIdx
+                                                  ? { ...g, options: g.options.map((o, j) => (j === oIdx ? { ...o, name: e.target.value } : o)) }
+                                                  : g
+                                              ));
+                                              updateAddonGroups(next);
+                                            }}
+                                            className="w-full px-3 py-1.5 rounded-lg bg-[#F6E9E5] border border-[#E5CFC9] text-xs text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            placeholder="Valor extra (+R$ 0)"
+                                            value={opt.extraPrice !== undefined && opt.extraPrice !== null ? opt.extraPrice : ''}
+                                            onChange={(e) => {
+                                              const next = addonGroups.map((g, i) => (
+                                                i === gIdx
+                                                  ? { ...g, options: g.options.map((o, j) => (j === oIdx ? { ...o, extraPrice: e.target.value } : o)) }
+                                                  : g
+                                              ));
+                                              updateAddonGroups(next);
+                                            }}
+                                            className="w-full px-3 py-1.5 rounded-lg bg-[#F6E9E5] border border-[#E5CFC9] text-xs text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {(grp.options || []).length > 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = addonGroups.map((g, i) => (
+                                              i === gIdx ? { ...g, options: g.options.filter((_, j) => j !== oIdx) } : g
+                                            ));
+                                            updateAddonGroups(next);
+                                          }}
+                                          className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 self-end sm:self-center"
+                                          title="Remover opção"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = addonGroups.map((g, i) => (
+                                      i === gIdx
+                                        ? { ...g, options: [...(g.options || []), { name: '', image: '', extraPrice: '' }] }
+                                        : g
+                                    ));
+                                    updateAddonGroups(next);
+                                  }}
+                                  className="px-3 py-1.5 rounded-full bg-[#F6E9E5] hover:bg-[#FCEEF2] text-[#A90F4D] text-[11px] font-semibold inline-flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />Adicionar opção em &quot;{grp.title || 'grupo'}&quot;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SEÇÃO 3.2: Personalização pelo Cliente (Letra Inicial / Nome / Quantidade > 1) */}
+                      <div className={`rounded-2xl p-4 border-2 transition-colors space-y-3 ${customCfg.enabled ? 'bg-[#FCEEF2]/60 border-[#A90F4D]' : 'bg-white/90 border-[#EAD6D0]'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(customCfg.enabled)}
+                                onChange={(e) => updateCustomCfg({ enabled: e.target.checked })}
+                                className="accent-[#A90F4D] w-4 h-4"
+                              />
+                              <span className="text-xs sm:text-sm font-bold text-[#4A2532]">
+                                ✨ Produto Personalizável (Pedir Letra Inicial e/ou Nome ao comprador)
+                              </span>
+                            </label>
+                            <p className="text-[11px] text-[#795344] mt-1 pl-6">
+                              Ideal para Chaveiros com Inicial/Nome, Cuias Personalizadas, Kits Presente etc. Se o cliente escolher <strong>2 ou mais unidades</strong>, o site abre automaticamente os campos separados para cada unidade!
+                            </p>
+                          </div>
+                        </div>
+
+                        {customCfg.enabled && (
+                          <div className="pl-0 sm:pl-6 pt-2 space-y-3 border-t border-[#E5B8C7]/60">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={customCfg.askInitial !== false}
+                                  onChange={(e) => updateCustomCfg({ askInitial: e.target.checked })}
+                                  className="accent-[#A90F4D]"
+                                />
+                                <div>
+                                  <span className="block font-semibold text-[#4A2532]">Pedir Letra Inicial (A–Z)</span>
+                                  <span className="text-[10px] text-[#795344]">Mostra seletor de letra para cada peça</span>
+                                </div>
+                              </label>
+
+                              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={customCfg.askName !== false}
+                                  onChange={(e) => updateCustomCfg({ askName: e.target.checked })}
+                                  className="accent-[#A90F4D]"
+                                />
+                                <div>
+                                  <span className="block font-semibold text-[#4A2532]">Pedir Nome ou Texto para gravar</span>
+                                  <span className="text-[10px] text-[#795344]">Campo para o cliente digitar o nome</span>
+                                </div>
+                              </label>
+
+                              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(customCfg.askNotes)}
+                                  onChange={(e) => updateCustomCfg({ askNotes: e.target.checked })}
+                                  className="accent-[#A90F4D]"
+                                />
+                                <div>
+                                  <span className="block font-semibold text-[#4A2532]">Campo de Observação Extra</span>
+                                  <span className="text-[10px] text-[#795344]">Ex: detalhes de cor, recado ou preferência</span>
+                                </div>
+                              </label>
+
+                              <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={customCfg.required !== false}
+                                  onChange={(e) => updateCustomCfg({ required: e.target.checked })}
+                                  className="accent-[#A90F4D]"
+                                />
+                                <div>
+                                  <span className="block font-semibold text-[#A90F4D]">Preenchimento Obrigatório</span>
+                                  <span className="text-[10px] text-[#795344]">Impede adicionar sem informar a inicial/nome</span>
+                                </div>
+                              </label>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10.5px] font-semibold text-[#5A382E] mb-1">
+                                Instrução exibida para o cliente na tela do produto:
+                              </label>
+                              <input
+                                type="text"
+                                value={customCfg.promptLabel || ''}
+                                onChange={(e) => updateCustomCfg({ promptLabel: e.target.value })}
+                                placeholder="Informe a letra inicial e/ou o nome para personalizar sua peça:"
+                                className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SEÇÃO 5: Descrição */}
                       <div className="bg-white/80 rounded-2xl p-4 border border-[#EAD6D0] space-y-2">
-                        <label className="block font-bold text-[#4A2532] uppercase tracking-wider">4. Descrição do Produto</label>
+                        <label className="block font-bold text-[#4A2532] uppercase tracking-wider">5. Descrição do Produto</label>
                         <textarea
                           rows={3}
                           placeholder="Conte os detalhes encantadores do produto: aromas, ingredientes, acabamento artesanal, medidas ou sugestões de uso..."
@@ -3130,11 +3688,277 @@ export default function App() {
 
             {activeView === 'product' && selectedProduct && (() => {
               const normVars = normalizeVariationsList(selectedProduct.variations);
-              const activeVarObj = findVariationObj(selectedProduct, selectedVariation);
-              const effectivePrice = activeVarObj?.price !== '' && activeVarObj?.price !== null && Number(activeVarObj?.price) > 0
-                ? Number(activeVarObj.price)
-                : Number(selectedProduct.price || 0);
+              const customCfg = extractProductCustomization(selectedProduct);
+              const addonGroups = Array.isArray(customCfg.addonGroups) ? customCfg.addonGroups : [];
+              const hasAdvancedConfig = Boolean(customCfg.enabled) || addonGroups.length > 0;
+
+              // Garante que unitConfigs tenha exatamente `productQty` itens
+              const syncedUnits = Array.from({ length: productQty }, (_, idx) => {
+                const existing = unitConfigs[idx];
+                if (existing) return existing;
+                const template = unitConfigs[0] || buildDefaultUnitConfig(selectedProduct, selectedVariation);
+                return {
+                  variation: template.variation || selectedVariation || normVars[0]?.name || 'Padrão',
+                  addons: { ...(template.addons || {}) },
+                  initial: '',
+                  customName: '',
+                  notes: ''
+                };
+              });
+
+              const updateUnitAt = (uIdx, patch) => {
+                setProductCustomError('');
+                const next = syncedUnits.map((u, i) => (i === uIdx ? { ...u, ...patch } : u));
+                setUnitConfigs(next);
+                if (uIdx === 0 && patch.variation) {
+                  setSelectedVariation(patch.variation);
+                  const vObj = findVariationObj(selectedProduct, patch.variation);
+                  if (vObj?.image) setSelectedVariationImage(vObj.image);
+                }
+              };
+
+              const computeUnitPrice = (u) => {
+                const vObj = findVariationObj(selectedProduct, u.variation);
+                let price = vObj?.price !== '' && vObj?.price !== null && Number(vObj?.price) > 0
+                  ? Number(vObj.price)
+                  : Number(selectedProduct.price || 0);
+                addonGroups.forEach((grp) => {
+                  const chosen = u.addons?.[grp.title] || grp.options?.[0]?.name;
+                  const opt = (grp.options || []).find((o) => o.name === chosen);
+                  if (opt?.extraPrice && Number(opt.extraPrice) > 0) {
+                    price += Number(opt.extraPrice);
+                  }
+                });
+                return price;
+              };
+
+              const firstUnit = syncedUnits[0] || buildDefaultUnitConfig(selectedProduct, selectedVariation);
+              const activeVarObj = findVariationObj(selectedProduct, firstUnit.variation || selectedVariation);
+              const unit1Price = computeUnitPrice(firstUnit);
+              const totalUnitsPrice = syncedUnits.reduce((sum, u) => sum + computeUnitPrice(u), 0);
               const displayedMainImage = selectedVariationImage || selectedProduct.gallery?.[activeGalleryIdx] || selectedProduct.image;
+
+              const changeQty = (nextQty) => {
+                const clamped = Math.max(1, nextQty);
+                setProductQty(clamped);
+                setUnitConfigs((prev) => {
+                  return Array.from({ length: clamped }, (_, i) => {
+                    if (prev[i]) return prev[i];
+                    const base = prev[0] || buildDefaultUnitConfig(selectedProduct, selectedVariation);
+                    return {
+                      variation: base.variation || selectedVariation || normVars[0]?.name || 'Padrão',
+                      addons: { ...(base.addons || {}) },
+                      initial: '',
+                      customName: '',
+                      notes: ''
+                    };
+                  });
+                });
+              };
+
+              const handleAddProductToCart = () => {
+                setProductCustomError('');
+                if (customCfg.enabled && customCfg.required) {
+                  for (let i = 0; i < syncedUnits.length; i++) {
+                    const u = syncedUnits[i];
+                    const missingInitial = customCfg.askInitial !== false && !String(u.initial || '').trim();
+                    const missingName = customCfg.askName !== false && !String(u.customName || '').trim();
+                    if (missingInitial || missingName) {
+                      const labelPiece = syncedUnits.length > 1 ? ` da Peça #${i + 1}` : '';
+                      setProductCustomError(
+                        `Por favor, preencha ${missingInitial && missingName ? 'a letra inicial e o nome' : missingInitial ? 'a letra inicial' : 'o nome'}${labelPiece} para personalizar seu pedido.`
+                      );
+                      return;
+                    }
+                  }
+                }
+                if (hasAdvancedConfig || syncedUnits.length > 1) {
+                  addToCart(selectedProduct, productQty, selectedVariation, null, syncedUnits);
+                } else {
+                  addToCart(selectedProduct, productQty, selectedVariation);
+                }
+              };
+
+              const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+              const renderUnitEditor = (u, uIdx, isMulti) => (
+                <div
+                  key={uIdx}
+                  className={`rounded-2xl p-3.5 sm:p-4 space-y-3.5 border ${
+                    isMulti ? 'bg-[#FFF9F3] border-[#DFC3BC] shadow-2xs' : 'bg-[#F6E9E5]/60 border-[#E5CFC9]'
+                  }`}
+                >
+                  {isMulti && (
+                    <div className="flex items-center justify-between border-b border-[#EFE0DC] pb-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A90F4D]">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Peça #{uIdx + 1} de {productQty}
+                      </span>
+                      <span className="text-xs font-bold text-[#4A2532]">{formatBRL(computeUnitPrice(u))}</span>
+                    </div>
+                  )}
+
+                  {/* Se for múltiplas unidades, permite escolher a variação/cor de cada unidade separadamente */}
+                  {isMulti && normVars.length > 1 && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#4A2532] mb-1.5">
+                        Cor / Variação da Peça #{uIdx + 1}: <span className="text-[#A90F4D] font-bold">{u.variation}</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {normVars.map((v, vI) => {
+                          const chosen = u.variation === v.name;
+                          return (
+                            <button
+                              key={`${v.name}-${vI}`}
+                              type="button"
+                              onClick={() => {
+                                updateUnitAt(uIdx, { variation: v.name });
+                                if (v.image) setSelectedVariationImage(v.image);
+                              }}
+                              className={`p-1 pr-2.5 rounded-xl text-[11px] font-medium border transition flex items-center gap-1.5 ${
+                                chosen
+                                  ? 'bg-[#A90F4D] text-white border-[#A90F4D]'
+                                  : 'bg-white text-[#5A382E] border-[#E2C7C0] hover:border-[#A90F4D]'
+                              } ${!v.image ? 'pl-2.5 py-1.5 rounded-full' : ''}`}
+                            >
+                              {v.image && <img src={v.image} alt={v.name} className="w-6 h-6 rounded-lg object-cover" />}
+                              <span>{v.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grupos extras de combinação (Ex: Decoração / Enfeite ao redor) */}
+                  {addonGroups.map((grp, gIdx) => {
+                    const currentChoice = u.addons?.[grp.title] || grp.options?.[0]?.name || '';
+                    return (
+                      <div key={grp.id || gIdx} className="space-y-1.5">
+                        <label className="block text-[11px] font-semibold text-[#4A2532]">
+                          {grp.title}{isMulti ? ` (Peça #${uIdx + 1})` : ''}:{' '}
+                          <span className="text-[#A90F4D] font-bold">{currentChoice}</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {(grp.options || []).map((opt, oIdx) => {
+                            const isOptSelected = currentChoice === opt.name;
+                            return (
+                              <button
+                                key={`${opt.name}-${oIdx}`}
+                                type="button"
+                                onClick={() => {
+                                  updateUnitAt(uIdx, {
+                                    addons: { ...(u.addons || {}), [grp.title]: opt.name }
+                                  });
+                                  if (opt.image) setSelectedVariationImage(opt.image);
+                                }}
+                                className={`p-1.5 pr-3 rounded-xl text-[11px] font-medium border transition-all flex items-center gap-2 ${
+                                  isOptSelected
+                                    ? 'bg-[#A90F4D] text-white border-[#A90F4D] shadow-xs'
+                                    : 'bg-white text-[#5A382E] border-[#E2C7C0] hover:border-[#A90F4D]'
+                                } ${!opt.image ? 'pl-3 py-1.5 rounded-full' : ''}`}
+                              >
+                                {opt.image && (
+                                  <img src={opt.image} alt={opt.name} className="w-7 h-7 rounded-lg object-cover shrink-0" />
+                                )}
+                                <div className="text-left leading-tight">
+                                  <span className="block font-semibold">{opt.name}</span>
+                                  {opt.extraPrice && Number(opt.extraPrice) > 0 && (
+                                    <span className={`block text-[9.5px] ${isOptSelected ? 'text-[#FAD4E0]' : 'text-[#A90F4D]'}`}>
+                                      + {formatBRL(opt.extraPrice)}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Campos de Personalização (Letra Inicial / Nome / Observação) */}
+                  {customCfg.enabled && (
+                    <div className="space-y-2.5 pt-1">
+                      {!isMulti && (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-[#A90F4D]">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>{customCfg.promptLabel || 'Personalize sua peça:'}</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {customCfg.askInitial !== false && (
+                          <div>
+                            <label className="block text-[11px] font-semibold text-[#4A2532] mb-1">
+                              Letra Inicial {customCfg.required !== false ? '*' : ''}
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={3}
+                              placeholder="Ex: M"
+                              value={u.initial || ''}
+                              onChange={(e) => updateUnitAt(uIdx, { initial: e.target.value.toUpperCase() })}
+                              className="w-full px-3 py-2 rounded-xl bg-white border border-[#DFC3BC] text-sm font-bold text-center text-[#A90F4D] uppercase placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]"
+                            />
+                          </div>
+                        )}
+
+                        {customCfg.askName !== false && (
+                          <div className={customCfg.askInitial !== false ? 'sm:col-span-2' : 'sm:col-span-3'}>
+                            <label className="block text-[11px] font-semibold text-[#4A2532] mb-1">
+                              Nome ou palavra na peça {customCfg.required !== false ? '*' : ''}
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={40}
+                              placeholder="Ex: Maria Clara"
+                              value={u.customName || ''}
+                              onChange={(e) => updateUnitAt(uIdx, { customName: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#DFC3BC] text-xs sm:text-sm text-[#4A2532] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Teclado rápido de letras A-Z */}
+                      {customCfg.askInitial !== false && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {LETTERS.map((letter) => (
+                            <button
+                              key={letter}
+                              type="button"
+                              onClick={() => updateUnitAt(uIdx, { initial: letter })}
+                              className={`w-6 h-6 rounded-md text-[10px] font-bold transition ${
+                                String(u.initial || '').toUpperCase() === letter
+                                  ? 'bg-[#A90F4D] text-white shadow-2xs'
+                                  : 'bg-white text-[#5A382E] border border-[#E5CFC9] hover:border-[#A90F4D]'
+                              }`}
+                            >
+                              {letter}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {customCfg.askNotes && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#4A2532] mb-1">
+                            Observações desta peça (opcional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Quero com bastante folha de ouro, embalagem para presente..."
+                            value={u.notes || ''}
+                            onChange={(e) => updateUnitAt(uIdx, { notes: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl bg-white border border-[#DFC3BC] text-xs text-[#4A2532] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
 
               return (
                 <div className="mx-auto w-full max-w-[1180px] px-4 lg:px-8 py-4 lg:py-8 space-y-5">
@@ -3176,19 +4000,28 @@ export default function App() {
                       )}
                     </div>
                     <div className="flex flex-col justify-between space-y-4">
-                      <div className="space-y-2.5">
-                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#A90F4D]">{categories.find((c) => c.id === selectedProduct.category)?.name}</span>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold text-[#A90F4D]">{categories.find((c) => c.id === selectedProduct.category)?.name}</span>
+                          {customCfg.enabled && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FCEEF2] text-[#A90F4D] text-[10px] font-bold">
+                              <Sparkles className="w-3 h-3" />Personalizável
+                            </span>
+                          )}
+                        </div>
                         <h1 className="font-serif-display text-2xl sm:text-3xl text-[#4A2532] font-semibold leading-tight">{selectedProduct.name}</h1>
-                        <p className="text-3xl font-bold text-[#A90F4D] pt-1">{formatBRL(effectivePrice)}</p>
+                        <p className="text-3xl font-bold text-[#A90F4D] pt-0.5">{formatBRL(unit1Price)}</p>
                         <p className="text-xs sm:text-sm text-[#6D493B] leading-relaxed pt-1 whitespace-pre-line">{selectedProduct.description}</p>
-                        {normVars.length > 0 && (
-                          <div className="pt-3">
+
+                        {/* Variação principal (quando quantidade = 1 ou produto simples) */}
+                        {normVars.length > 0 && (productQty === 1 || !hasAdvancedConfig) && (
+                          <div className="pt-2">
                             <label className="block text-xs font-semibold text-[#4A2532] mb-2">
-                              Escolha a opção: <span className="text-[#A90F4D] font-bold">{selectedVariation}</span>
+                              Escolha a opção: <span className="text-[#A90F4D] font-bold">{firstUnit.variation || selectedVariation}</span>
                             </label>
                             <div className="flex flex-wrap gap-2.5">
                               {normVars.map((v, idx) => {
-                                const isChosen = selectedVariation === v.name;
+                                const isChosen = (firstUnit.variation || selectedVariation) === v.name;
                                 const hasCustomPrice = v.price !== '' && v.price !== null && Number(v.price) > 0 && Number(v.price) !== Number(selectedProduct.price);
                                 return (
                                   <button
@@ -3196,6 +4029,7 @@ export default function App() {
                                     type="button"
                                     onClick={() => {
                                       setSelectedVariation(v.name);
+                                      updateUnitAt(0, { variation: v.name });
                                       if (v.image) setSelectedVariationImage(v.image);
                                     }}
                                     className={`p-1.5 pr-3.5 rounded-2xl text-xs font-medium border transition-all flex items-center gap-2.5 ${
@@ -3225,19 +4059,61 @@ export default function App() {
                             </div>
                           </div>
                         )}
+
+                        {/* Quando Quantidade = 1 e tem grupos extras ou personalização */}
+                        {hasAdvancedConfig && productQty === 1 && renderUnitEditor(firstUnit, 0, false)}
+
+                        {/* Quando Quantidade > 1: abre os campos por unidade! */}
+                        {productQty > 1 && (hasAdvancedConfig || normVars.length > 1) && (
+                          <div className="space-y-3 pt-2">
+                            <div className="p-3 rounded-2xl bg-[#FCEEF2] border border-[#E5B8C7] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <p className="text-[11.5px] font-semibold text-[#4A2532]">
+                                🎁 Você selecionou <strong>{productQty} unidades</strong>. Escolha abaixo a variação, decoração e personalização de cada peça (podem ser iguais ou diferentes!):
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const first = syncedUnits[0];
+                                  setUnitConfigs(syncedUnits.map((u, idx) => (idx === 0 ? u : { ...u, variation: first.variation, addons: { ...first.addons } })));
+                                  showAdminToast('Cor e decoração da Peça #1 aplicadas em todas!');
+                                }}
+                                className="px-3 py-1 rounded-full bg-white text-[#A90F4D] border border-[#E5B8C7] text-[10.5px] font-bold shrink-0 self-start sm:self-auto hover:bg-[#FFF9F3]"
+                              >
+                                Repetir cor/decoração da #1
+                              </button>
+                            </div>
+                            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                              {syncedUnits.map((u, uIdx) => renderUnitEditor(u, uIdx, true))}
+                            </div>
+                          </div>
+                        )}
                       </div>
+
                       <div className="pt-3 space-y-3 border-t border-[#F0DCD6]">
+                        {productCustomError && (
+                          <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{productCustomError}</span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-[#4A2532]">Quantidade:</span>
+                          <div>
+                            <span className="text-xs font-semibold text-[#4A2532] block">Quantidade:</span>
+                            {(hasAdvancedConfig || normVars.length > 1) && (
+                              <span className="text-[10.5px] text-[#795344]">
+                                {productQty === 1 ? 'Aumente para personalizar mais peças de uma vez' : `Configurando ${productQty} peças individualmente`}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-3 bg-[#F6E9E5] px-3 py-1.5 rounded-full border border-[#E2C7C0]">
-                            <button type="button" onClick={() => setProductQty((q) => Math.max(1, q - 1))} className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"><Minus className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => changeQty(productQty - 1)} className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"><Minus className="w-3.5 h-3.5" /></button>
                             <span className="text-sm font-bold w-5 text-center">{productQty}</span>
-                            <button type="button" onClick={() => setProductQty((q) => q + 1)} className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"><Plus className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => changeQty(productQty + 1)} className="w-6 h-6 rounded-full bg-[#FFF9F3] flex items-center justify-center text-[#A90F4D]"><Plus className="w-3.5 h-3.5" /></button>
                           </div>
                         </div>
                         <div className="flex gap-2.5">
-                          <button type="button" onClick={() => addToCart(selectedProduct, productQty, selectedVariation)} className="flex-1 py-3.5 px-5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition">
-                            <ShoppingCart className="w-4 h-4" /><span>Adicionar • {formatBRL(effectivePrice * productQty)}</span>
+                          <button type="button" onClick={handleAddProductToCart} className="flex-1 py-3.5 px-5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition">
+                            <ShoppingCart className="w-4 h-4" /><span>Adicionar • {formatBRL(totalUnitsPrice)}</span>
                           </button>
                         </div>
                       </div>
