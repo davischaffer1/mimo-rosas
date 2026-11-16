@@ -255,6 +255,39 @@ begin
 end;
 $$;
 
+-- Permite que um administrador promova (ou remova) outra conta pelo e-mail direto pelo painel /admin
+create or replace function public.set_admin_by_email(p_email text, p_is_admin boolean default true)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_target_id uuid;
+begin
+  if not public.is_admin() then
+    raise exception 'Apenas administradores podem alterar permissões.';
+  end if;
+
+  select id into v_target_id
+    from auth.users
+   where lower(email) = lower(trim(coalesce(p_email, '')))
+   limit 1;
+
+  if v_target_id is null then
+    return false;
+  end if;
+
+  insert into public.profiles (id, is_admin)
+  values (v_target_id, coalesce(p_is_admin, true))
+  on conflict (id) do update
+     set is_admin = excluded.is_admin;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.set_admin_by_email(text, boolean) to authenticated;
 grant execute on function public.cleanup_expired_orders() to anon, authenticated;
 grant execute on function public.cancel_my_pending_order(text) to authenticated;
 grant execute on function public.email_already_registered(text) to anon, authenticated;

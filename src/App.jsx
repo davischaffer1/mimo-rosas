@@ -562,6 +562,7 @@ export default function App() {
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState({ id: '', name: '', shortName: '', iconType: 'gift', description: '', isEditing: false });
+  const [newAdminEmailInput, setNewAdminEmailInput] = useState('');
   const [uploadStatusMsg, setUploadStatusMsg] = useState('');
   const [adminToast, setAdminToast] = useState('');
   const [selectedFilePreview, setSelectedFilePreview] = useState({ title: 'Arquivo 1: package.json', code: GITHUB_FILES.packageJson });
@@ -2098,6 +2099,60 @@ export default function App() {
     );
   };
 
+  const isEmailInAdminList = Boolean(
+    auth.user?.email
+    && Array.isArray(storeConfig.adminEmails)
+    && storeConfig.adminEmails.some((em) => String(em || '').trim().toLowerCase() === String(auth.user.email).trim().toLowerCase())
+  );
+  const isEffectiveAdmin = Boolean(auth.isAdmin || isEmailInAdminList);
+
+  const handleAddAdminEmail = async (e) => {
+    if (e) e.preventDefault();
+    const cleanEmail = String(newAdminEmailInput || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      showAdminToast('Digite um e-mail válido.');
+      return;
+    }
+    const currentList = Array.isArray(storeConfig.adminEmails) ? storeConfig.adminEmails : [];
+    const merged = Array.from(new Set([
+      ...currentList.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean),
+      ...(auth.user?.email ? [String(auth.user.email).trim().toLowerCase()] : []),
+      cleanEmail
+    ]));
+    const nextCfg = { ...storeConfig, adminEmails: merged };
+    setStoreConfig(nextCfg);
+    setNewAdminEmailInput('');
+    await syncStoreConfigToSupabase(nextCfg);
+    if (auth.client) {
+      try {
+        await auth.client.rpc('set_admin_by_email', { p_email: cleanEmail, p_is_admin: true });
+      } catch { /* ignora se a RPC ainda não tiver sido rodada */ }
+    }
+    showAdminToast(`Acesso de administrador liberado para ${cleanEmail}!`);
+  };
+
+  const handleRemoveAdminEmail = async (targetEmail) => {
+    const cleanTarget = String(targetEmail || '').trim().toLowerCase();
+    if (!cleanTarget) return;
+    if (auth.user?.email && cleanTarget === String(auth.user.email).trim().toLowerCase()) {
+      showAdminToast('Você não pode remover o seu próprio acesso.');
+      return;
+    }
+    const currentList = Array.isArray(storeConfig.adminEmails) ? storeConfig.adminEmails : [];
+    const filtered = currentList
+      .map((item) => String(item || '').trim().toLowerCase())
+      .filter((em) => em && em !== cleanTarget);
+    const nextCfg = { ...storeConfig, adminEmails: filtered };
+    setStoreConfig(nextCfg);
+    await syncStoreConfigToSupabase(nextCfg);
+    if (auth.client) {
+      try {
+        await auth.client.rpc('set_admin_by_email', { p_email: cleanTarget, p_is_admin: false });
+      } catch { /* ignora */ }
+    }
+    showAdminToast(`Acesso administrativo removido de ${cleanTarget}.`);
+  };
+
   // Portão do painel: loading -> login -> permissão -> painel
   // Antes do SQL rodar, cai na senha legada para não travar o acesso.
   useEffect(() => {
@@ -2113,7 +2168,7 @@ export default function App() {
     // Banco ainda sem a tabela profiles: mantém o acesso legado por senha
     if (!auth.profilesReady) return isAdminUnlocked ? 'open' : 'legacyPassword';
     if (!auth.user) return 'login';
-    return auth.isAdmin ? 'open' : 'forbidden';
+    return isEffectiveAdmin ? 'open' : 'forbidden';
   })();
 
   return (
@@ -3165,6 +3220,84 @@ export default function App() {
                           <Check className="w-4 h-4" />
                           <span>Salvar Configurações da Loja</span>
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Equipe & Acesso Administrativo (/admin) */}
+                    <div className="bg-[#FFF9F3] rounded-3xl p-5 sm:p-6 border border-[#EAD6D0] shadow-2xs space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center border border-[#E5B8C7]">
+                          <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                            Equipe & Acesso Administrativo
+                          </h3>
+                          <p className="text-xs text-[#795344]">
+                            Libere acesso ao painel <code>/admin</code> para outra conta (ex: e-mail da proprietária da loja). Basta que ela crie a conta no site com o mesmo e-mail abaixo!
+                          </p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleAddAdminEmail} className="flex flex-col sm:flex-row gap-2.5">
+                        <input
+                          type="email"
+                          required
+                          placeholder="Digite o e-mail da conta para tornar Admin (ex: cliente@gmail.com)"
+                          value={newAdminEmailInput}
+                          onChange={(e) => setNewAdminEmailInput(e.target.value)}
+                          className="flex-1 px-4 py-2.5 rounded-2xl bg-[#F6E9E5] border border-[#E5CFC9] text-xs text-[#4A2532] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
+                        />
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 rounded-full bg-[#4A2532] hover:bg-[#A90F4D] text-white text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-xs"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Conceder Acesso Admin</span>
+                        </button>
+                      </form>
+
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#795344] block">
+                          Contas com permissão de Administrador
+                        </span>
+                        <div className="space-y-2">
+                          {Array.from(
+                            new Set([
+                              ...(auth.user?.email ? [String(auth.user.email).trim().toLowerCase()] : []),
+                              ...((Array.isArray(storeConfig.adminEmails) ? storeConfig.adminEmails : []).map((em) => String(em || '').trim().toLowerCase()).filter(Boolean))
+                            ])
+                          ).map((adminEm) => {
+                            const isSelf = auth.user?.email && adminEm === String(auth.user.email).trim().toLowerCase();
+                            return (
+                              <div
+                                key={adminEm}
+                                className="px-3.5 py-2.5 rounded-2xl bg-[#F6E9E5]/70 border border-[#E5CFC9] flex items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="w-7 h-7 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                    {adminEm.charAt(0).toUpperCase()}
+                                  </span>
+                                  <span className="font-semibold text-[#4A2532] truncate">{adminEm}</span>
+                                  {isSelf && (
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                      Sua conta atual
+                                    </span>
+                                  )}
+                                </div>
+                                {!isSelf && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAdminEmail(adminEm)}
+                                    className="px-2.5 py-1 rounded-full bg-red-50 hover:bg-red-100 text-red-600 text-[10.5px] font-semibold transition-colors shrink-0"
+                                  >
+                                    Remover acesso
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5004,7 +5137,7 @@ export default function App() {
                 <div className="mx-auto w-full max-w-md px-4 py-8 lg:py-14">
                   <AuthPanel variant="customer" auth={auth} embedded />
                 </div>
-              ) : auth.isAdmin ? (
+              ) : isEffectiveAdmin ? (
                 <div className="mx-auto w-full max-w-md px-4 py-10">
                   <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EAD6D0] shadow-xl text-center space-y-3">
                     <div className="w-14 h-14 rounded-2xl bg-[#3A1C28] text-[#FAD4E0] flex items-center justify-center mx-auto"><ShieldCheck className="w-7 h-7" /></div>
