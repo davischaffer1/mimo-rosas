@@ -417,7 +417,11 @@ export default function App() {
     try { const s = localStorage.getItem('mimo_rosas_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
   const [favorites, setFavorites] = useState(() => {
-    try { const s = localStorage.getItem('mimo_rosas_favs'); return s ? JSON.parse(s) : ['prod-1', 'prod-2']; } catch { return ['prod-1', 'prod-2']; }
+    try {
+      localStorage.removeItem('mimo_rosas_favs');
+      const s = localStorage.getItem('mimo_rosas_favs_v2');
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
   });
 
   const [checkoutData, setCheckoutData] = useState({
@@ -496,7 +500,7 @@ export default function App() {
   }, [orderSuccess]);
   useEffect(() => { try { localStorage.setItem('mimo_db_config', JSON.stringify(storeConfig)); } catch { /* ignore */ } }, [storeConfig]);
   useEffect(() => { try { localStorage.setItem('mimo_rosas_cart', JSON.stringify(cart)); } catch { /* ignore */ } }, [cart]);
-  useEffect(() => { try { localStorage.setItem('mimo_rosas_favs', JSON.stringify(favorites)); } catch { /* ignore */ } }, [favorites]);
+  useEffect(() => { try { localStorage.setItem('mimo_rosas_favs_v2', JSON.stringify(favorites)); } catch { /* ignore */ } }, [favorites]);
   useEffect(() => {
     try {
       localStorage.setItem('mimo_sb_url', supabaseUrl);
@@ -515,20 +519,53 @@ export default function App() {
   useEffect(() => {
     let active = true;
     const syncFavorites = async () => {
-      if (!auth.client || !auth.user) return;
+      if (!auth.client) return;
+      if (!auth.user) {
+        // Se saiu de uma conta logada, limpa os favoritos locais daquela conta
+        try {
+          const prevOwner = localStorage.getItem('mimo_rosas_favs_owner') || '';
+          if (prevOwner && prevOwner !== 'guest') {
+            localStorage.removeItem('mimo_rosas_favs_owner');
+            localStorage.removeItem('mimo_rosas_favs_v2');
+            if (active) setFavorites([]);
+          }
+        } catch { /* ignora */ }
+        return;
+      }
       try {
-        const { data: rows, error } = await auth.client.from('favorites').select('product_id');
+        const { data: rows, error } = await auth.client
+          .from('favorites')
+          .select('product_id')
+          .eq('user_id', auth.user.id);
         if (error || !active) return;
-        const remote = (rows || []).map((r) => r.product_id);
-        let local = [];
-        try { local = JSON.parse(localStorage.getItem('mimo_rosas_favs') || '[]'); } catch { local = []; }
+        let remote = (rows || []).map((r) => r.product_id);
 
-        // Só mescla os favoritos do navegador se ainda não pertencerem a outra conta
-        // (evita que um cliente no mesmo computador veja a lista do anterior).
+        // Limpa uma única vez os 2 favoritos ("prod-1" e "prod-2") que vinham hardcoded por padrão
+        // nas contas criadas antes desta correção
+        const cleanKey = `mimo_rosas_cleaned_defaults_${auth.user.id}`;
+        let alreadyCleaned = false;
+        try { alreadyCleaned = localStorage.getItem(cleanKey) === '1'; } catch { alreadyCleaned = false; }
+        if (!alreadyCleaned) {
+          const legacyDefaults = remote.filter((id) => id === 'prod-1' || id === 'prod-2');
+          if (legacyDefaults.length > 0) {
+            await auth.client
+              .from('favorites')
+              .delete()
+              .eq('user_id', auth.user.id)
+              .in('product_id', legacyDefaults);
+            remote = remote.filter((id) => id !== 'prod-1' && id !== 'prod-2');
+          }
+          try { localStorage.setItem(cleanKey, '1'); } catch { /* ignora */ }
+        }
+
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem('mimo_rosas_favs_v2') || '[]'); } catch { local = []; }
+
+        // Só mescla os favoritos do navegador se a pessoa clicou em favoritar como visitante ('guest')
         let owner = '';
         try { owner = localStorage.getItem('mimo_rosas_favs_owner') || ''; } catch { owner = ''; }
-        const sameOwner = !owner || owner === auth.user.id;
-        const merged = sameOwner ? Array.from(new Set([...remote, ...local])) : remote;
+        const shouldMergeGuest = owner === 'guest';
+        const merged = shouldMergeGuest ? Array.from(new Set([...remote, ...local])) : remote;
         const toInsert = merged.filter((id) => !remote.includes(id));
         if (toInsert.length > 0) {
           await auth.client.from('favorites').insert(toInsert.map((product_id) => ({ user_id: auth.user.id, product_id })));
@@ -1005,6 +1042,7 @@ export default function App() {
 
   const visibleProducts = useMemo(() => products.filter((p) => p.active !== false), [products]);
   const featuredProducts = useMemo(() => visibleProducts.filter((p) => p.featured), [visibleProducts]);
+  const favoriteProducts = useMemo(() => visibleProducts.filter((p) => favorites.includes(p.id)), [visibleProducts, favorites]);
   const filteredProducts = useMemo(() => {
     let list = [...visibleProducts];
     if (selectedCategory !== 'all') list = list.filter((p) => p.category === selectedCategory);
@@ -1047,6 +1085,8 @@ export default function App() {
       Promise.resolve(request).then(({ error }) => {
         if (error) console.warn('Favoritos (Supabase):', error.message);
       });
+    } else {
+      try { localStorage.setItem('mimo_rosas_favs_owner', 'guest'); } catch { /* ignora */ }
     }
   };
   const addToCart = (product, qty = 1, variation = null, e = null) => {
@@ -2346,15 +2386,15 @@ export default function App() {
 
             {activeView === 'favorites' && (
               <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-4 lg:py-8 space-y-4 lg:space-y-6">
-                <h1 className="font-serif-display text-2xl lg:text-3xl text-[#4E2F26] font-semibold">Meus Favoritos ({favorites.length})</h1>
-                {favorites.length === 0 ? (
+                <h1 className="font-serif-display text-2xl lg:text-3xl text-[#4E2F26] font-semibold">Meus Favoritos ({favoriteProducts.length})</h1>
+                {favoriteProducts.length === 0 ? (
                   <div className="bg-[#FFF9F3] rounded-3xl p-8 text-center border border-[#EBD5CF]">
                     <Heart className="w-10 h-10 text-[#A90F4D] mx-auto mb-2 opacity-60" />
                     <p className="text-sm text-[#795344]">Sua lista de desejos ainda está vazia.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 lg:gap-6">
-                    {visibleProducts.filter((p) => favorites.includes(p.id)).map((product) => renderProductCard(product))}
+                    {favoriteProducts.map((product) => renderProductCard(product))}
                   </div>
                 )}
               </div>
