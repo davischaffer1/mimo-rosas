@@ -241,6 +241,33 @@ const HeartFlourishSVG = ({ className = 'w-64 h-8' }) => (
   </svg>
 );
 
+const CATEGORY_ICON_OPTIONS = [
+  { id: 'gift', label: 'Presente' },
+  { id: 'cuia', label: 'Cuia' },
+  { id: 'leaves', label: 'Ervas/Blend' },
+  { id: 'coffee-bean', label: 'Café' },
+  { id: 'tea-cup', label: 'Chá/Xícara' },
+  { id: 'cuia-resin', label: 'Resina' },
+  { id: 'keychain', label: 'Chaveiro' },
+  { id: 'bomba', label: 'Bomba' },
+  { id: 'rose', label: 'Rosa' },
+  { id: 'candle', label: 'Vela' },
+  { id: 'diffuser', label: 'Difusor' },
+  { id: 'drink', label: 'Drinks/Gin' },
+  { id: 'thermos', label: 'Térmica' },
+  { id: 'butterfly', label: 'Borboleta' },
+  { id: 'heart-sparkle', label: 'Afeto/Amor' },
+  { id: 'jar', label: 'Pote/Tubo' },
+  { id: 'jewelry', label: 'Pingente' },
+  { id: 'mateira', label: 'Mateira' },
+  { id: 'chocolate', label: 'Doces' },
+  { id: 'crown', label: 'Imperial' },
+  { id: 'star-wand', label: 'Personalizado' },
+  { id: 'coaster', label: 'Porta-Copo' },
+  { id: 'bouquet', label: 'Buquê' },
+  { id: 'spoon', label: 'Colher/Mimo' }
+];
+
 const CategoryIconSVG = ({ type }) => {
   const stroke = '#A90F4D';
   switch (type) {
@@ -260,7 +287,40 @@ const CategoryIconSVG = ({ type }) => {
       return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><circle cx="24" cy="13" r="5" stroke={stroke} strokeWidth="2" /><path d="M24 18V23" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M24 39C18 34 14 29.5 14 25.5C14 22.5 16.5 20.5 19 20.5C21 20.5 23 22 24 23.5C25 22 27 20.5 29 20.5C31.5 20.5 34 22.5 34 25.5C34 29.5 30 34 24 39Z" stroke={stroke} strokeWidth="2" /></svg>);
     case 'bomba':
       return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M31 9L19 31" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" /><path d="M31 9L35 7" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" /><circle cx="25" cy="20" r="3" fill="#F6E9E5" stroke={stroke} strokeWidth="1.8" /><ellipse cx="17" cy="35" rx="5" ry="6" transform="rotate(25 17 35)" stroke={stroke} strokeWidth="2" /></svg>);
-    default: return null;
+    case 'rose':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M16 14C16 10 20 8 24 8C28 8 32 10 32 14C32 17 28 19 24 19C20 19 16 17 16 14Z" stroke={stroke} strokeWidth="2" /><path d="M15 13C12 16 12 24 17 28C21 31 27 31 31 28C36 24 36 16 33 13" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M24 30V41" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M24 36C20 33 16 32 13 34C16 37 20 38 24 37" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /><path d="M24 37C28 34 32 33 35 35C32 38 28 39 24 38" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /></svg>);
+    case 'candle':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M24 8C21 12 20 14.5 22 17C23.2 18.2 24.8 18.2 26 17C28 14.5 27 12 24 8Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M24 18V21" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><rect x="14" y="21" width="20" height="18" rx="3" stroke={stroke} strokeWidth="2" /><path d="M14 27H34" stroke={stroke} strokeWidth="1.8" /><circle cx="35" cy="12" r="1.5" fill={stroke} /></svg>);
+    case 'diffuser':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M19 8L23 21M29 8L25 21M24 7V21" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /><rect x="20" y="20" width="8" height="4" rx="1" stroke={stroke} strokeWidth="2" /><path d="M16 28C16 25.5 18 24 20 24H28C30 24 32 25.5 32 28V37C32 38.7 30.7 40 29 40H19C17.3 40 16 38.7 16 37V28Z" stroke={stroke} strokeWidth="2" /><path d="M19 32H29" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" /></svg>);
+    case 'drink':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M13 14H35L24 27L13 14Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M24 27V38" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M18 38H30" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M28 9L23 20" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /><circle cx="16" cy="14" r="4" stroke={stroke} strokeWidth="1.8" /></svg>);
+    case 'thermos':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><rect x="19" y="8" width="10" height="5" rx="1.5" stroke={stroke} strokeWidth="2" /><path d="M16 17C16 14.8 17.8 13 20 13H28C30.2 13 32 14.8 32 17V37C32 38.7 30.7 40 29 40H19C17.3 40 16 38.7 16 37V17Z" stroke={stroke} strokeWidth="2" /><path d="M32 19H35C36.7 19 38 20.3 38 22V29C38 30.7 36.7 32 35 32H32" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M16 24H32" stroke={stroke} strokeWidth="1.8" /></svg>);
+    case 'butterfly':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M24 14V35" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M24 19C19 11 10 12 10 20C10 25 16 26 24 25C17 27 13 32 16 36C18 39 22 36 24 31" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M24 19C29 11 38 12 38 20C38 25 32 26 24 25C31 27 35 32 32 36C30 39 26 36 24 31" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>);
+    case 'heart-sparkle':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M24 38C16 32 11 26.5 11 20.5C11 16.5 14 13.5 18 13.5C20.5 13.5 22.8 15 24 17C25.2 15 27.5 13.5 30 13.5C34 13.5 37 16.5 37 20.5C37 26.5 32 32 24 38Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M36 8L37 11L40 12L37 13L36 16L35 13L32 12L35 11L36 8Z" fill={stroke} /></svg>);
+    case 'jar':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><rect x="18" y="9" width="12" height="5" rx="1.5" stroke={stroke} strokeWidth="2" /><path d="M16 14H32L34 18V36C34 38.2 32.2 40 30 40H18C15.8 40 14 38.2 14 36V18L16 14Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M19 25C21 23 27 23 29 25M21 30C23 32 25 32 27 30" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /></svg>);
+    case 'jewelry':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M14 10C16 18 20 22 24 22C28 22 32 18 34 10" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /><path d="M24 22L17 31L24 40L31 31L24 22Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M17 31H31" stroke={stroke} strokeWidth="1.6" /></svg>);
+    case 'mateira':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M18 18V14C18 10.7 20.7 8 24 8C27.3 8 30 10.7 30 14V18" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><path d="M13 18H35L33 38C32.8 39.1 31.9 40 30.8 40H17.2C16.1 40 15.2 39.1 15 38L13 18Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M24 25C22 25 20.5 26.5 20.5 28.2C20.5 30.5 24 33 24 33C24 33 27.5 30.5 27.5 28.2C27.5 26.5 26 25 24 25Z" stroke={stroke} strokeWidth="1.8" /></svg>);
+    case 'chocolate':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><rect x="14" y="10" width="20" height="28" rx="2.5" stroke={stroke} strokeWidth="2" /><path d="M24 10V38M14 19H34M14 28H34" stroke={stroke} strokeWidth="1.8" /></svg>);
+    case 'crown':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M10 34L13 16L20 24L24 13L28 24L35 16L38 34H10Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><path d="M11 38H37" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><circle cx="24" cy="10" r="1.5" fill={stroke} /></svg>);
+    case 'star-wand':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M11 37L26 22" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" /><path d="M31 10L33 15L38 17L33 19L31 24L29 19L24 17L29 15L31 10Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" /><circle cx="19" cy="13" r="1.5" fill={stroke} /><circle cx="36" cy="29" r="1.5" fill={stroke} /></svg>);
+    case 'coaster':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M24 10C32 10 38 15 39 23C40 31 33 38 25 38C16 38 10 33 10 24C10 16 16 10 24 10Z" stroke={stroke} strokeWidth="2" /><path d="M16 22C21 26 27 19 33 24" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" /><circle cx="22" cy="17" r="1.5" fill={stroke} /><circle cx="28" cy="30" r="1.5" fill={stroke} /></svg>);
+    case 'bouquet':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><path d="M16 18L24 38L32 18" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M19 31H29" stroke={stroke} strokeWidth="2" strokeLinecap="round" /><circle cx="19" cy="14" r="3.5" stroke={stroke} strokeWidth="1.8" /><circle cx="29" cy="14" r="3.5" stroke={stroke} strokeWidth="1.8" /><circle cx="24" cy="11" r="3.5" stroke={stroke} strokeWidth="1.8" /></svg>);
+    case 'spoon':
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><ellipse cx="29" cy="16" rx="6" ry="8" transform="rotate(35 29 16)" stroke={stroke} strokeWidth="2" /><path d="M24 22L12 38" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" /><path d="M15 31L19 34" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" /></svg>);
+    default:
+      return (<svg viewBox="0 0 48 48" fill="none" className="w-8 h-8"><rect x="11" y="18" width="26" height="7" rx="1.5" stroke={stroke} strokeWidth="2" /><path d="M13 25V37C13 38.1 13.9 39 15 39H33C34.1 39 35 38.1 35 37V25" stroke={stroke} strokeWidth="2" /><path d="M24 18V39" stroke={stroke} strokeWidth="2" /></svg>);
   }
 };
 
@@ -4362,18 +4422,11 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-[#5A382E] mb-1.5">Ícone na Vitrine</label>
-                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                          {[
-                            { id: 'gift', label: 'Presente' },
-                            { id: 'cuia', label: 'Cuia' },
-                            { id: 'leaves', label: 'Ervas/Flor' },
-                            { id: 'coffee-bean', label: 'Café' },
-                            { id: 'tea-cup', label: 'Chá' },
-                            { id: 'cuia-resin', label: 'Resina' },
-                            { id: 'keychain', label: 'Chaveiro' },
-                            { id: 'bomba', label: 'Bomba' }
-                          ].map((ic) => {
+                        <label className="block font-semibold text-[#5A382E] mb-1.5">
+                          Ícone na Vitrine ({CATEGORY_ICON_OPTIONS.length} opções)
+                        </label>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-56 overflow-y-auto p-1">
+                          {CATEGORY_ICON_OPTIONS.map((ic) => {
                             const selectedIcon = (editingCategory.iconType || 'gift') === ic.id;
                             return (
                               <button
@@ -4387,7 +4440,7 @@ export default function App() {
                                 }`}
                               >
                                 <CategoryIconSVG type={ic.id} />
-                                <span className="text-[9.5px] font-semibold text-[#4A2532]">{ic.label}</span>
+                                <span className="text-[9.5px] font-semibold text-[#4A2532] truncate max-w-full">{ic.label}</span>
                               </button>
                             );
                           })}
