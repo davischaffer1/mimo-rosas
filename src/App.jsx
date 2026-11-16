@@ -756,8 +756,27 @@ export default function App() {
           description: p.description || ''
         })));
       }
-      if (Array.isArray(dbOrders) && dbOrders.length > 0) {
-        const mappedOrders = dbOrders.map((o) => ({
+      if (Array.isArray(dbOrders)) {
+        const EXPIRATION_MS = 30 * 60 * 1000;
+        const isExpiredPending = (o) => {
+          const st = String(o?.status || 'Aguardando PIX');
+          if (!/aguardando/i.test(st) || !o?.created_at) return false;
+          const age = Date.now() - new Date(o.created_at).getTime();
+          return !Number.isNaN(age) && age > EXPIRATION_MS;
+        };
+
+        const expiredOrders = dbOrders.filter(isExpiredPending);
+        if (expiredOrders.length > 0) {
+          expiredOrders.forEach((exp) => {
+            fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(exp.id)}`, {
+              method: 'DELETE',
+              headers: sbHeaders('return=minimal')
+            }).catch(() => {});
+          });
+        }
+
+        const activeDbOrders = dbOrders.filter((o) => !isExpiredPending(o));
+        const mappedOrders = activeDbOrders.map((o) => ({
           id: o.id,
           customer: o.customer || o.customer_name || 'Cliente Mimo Rosas',
           customerName: o.customer || o.customer_name || 'Cliente Mimo Rosas',
@@ -771,11 +790,7 @@ export default function App() {
           createdAt: o.date || (o.created_at ? new Date(o.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Recente'),
           items: Array.isArray(o.items) ? o.items : []
         }));
-        setOrders((prevLocal) => {
-          const dbIds = new Set(mappedOrders.map((i) => i.id));
-          const unsynced = (prevLocal || []).filter((i) => i.id && !dbIds.has(i.id) && i.id !== 'MR-94821');
-          return [...unsynced, ...mappedOrders];
-        });
+        setOrders(mappedOrders);
       }
       setSbStatus({ connected: true, loading: false, message: `Conectado! (${dbProducts.length} produtos e ${dbOrders.length} pedidos no banco).` });
       if (!silent) showAdminToast('Conectado ao Supabase com sucesso!');
@@ -2427,6 +2442,29 @@ export default function App() {
                   favoriteIds={favorites}
                   renderProductCard={renderProductCard}
                   onToast={showAdminToast}
+                  onResumeOrder={(order) => {
+                    const code = order.id;
+                    const total = Number(order.total || 0);
+                    const pixCode = generatePixCopyPaste(
+                      storeConfig.pixKey || storeConfig.whatsappNumber,
+                      storeConfig.pixHolderName || 'MIMO ROSAS',
+                      'BRASIL',
+                      total,
+                      String(code).replace(/[^A-Z0-9]/g, '')
+                    );
+                    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+                    setOrderSuccess({
+                      code,
+                      customer: order.customer || order.customer_name || 'Cliente Mimo Rosas',
+                      total,
+                      method: order.payment_method || 'pix',
+                      pixCode,
+                      qrCodeUrl,
+                      paymentConfirmed: false
+                    });
+                    setActiveView('checkout');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                 />
               )
             )}

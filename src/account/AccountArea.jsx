@@ -1,10 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ClipboardList, Heart, User, Package, Truck, Store, CheckCircle2,
-  Clock, AlertCircle, LogOut, Loader2, Lock, Phone, Mail, Save, ExternalLink
+  Clock, AlertCircle, LogOut, Loader2, Lock, Phone, Mail, Save, ExternalLink, Trash2, QrCode
 } from 'lucide-react';
 
 const brl = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
+
+// Prazo máximo para concluir o pagamento de um pedido pendente (30 minutos)
+const ORDER_EXPIRATION_MINUTES = 30;
+const ORDER_EXPIRATION_MS = ORDER_EXPIRATION_MINUTES * 60 * 1000;
+
+const isPendingOrder = (order) => /aguardando/i.test(String(order?.status || ''));
+
+const getOrderAgeMs = (order) => {
+  if (!order?.created_at) return 0;
+  const ts = new Date(order.created_at).getTime();
+  return Number.isNaN(ts) ? 0 : Math.max(0, Date.now() - ts);
+};
+
+const isOrderExpired = (order) => isPendingOrder(order) && getOrderAgeMs(order) > ORDER_EXPIRATION_MS;
+
+const getRemainingMinutes = (order) => {
+  if (!isPendingOrder(order) || !order?.created_at) return null;
+  const remainingMs = ORDER_EXPIRATION_MS - getOrderAgeMs(order);
+  if (remainingMs <= 0) return 0;
+  return Math.max(1, Math.ceil(remainingMs / 60000));
+};
 
 const STATUS_STYLES = {
   'Pago': 'bg-emerald-100 text-emerald-800',
@@ -17,12 +38,13 @@ const STATUS_STYLES = {
 
 const statusClass = (status) => STATUS_STYLES[status] || 'bg-[#F6E9E5] text-[#795344]';
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, remainingMin }) {
   const isPending = /aguardando/i.test(status || '');
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${statusClass(status)}`}>
       {isPending ? <Clock className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
       {status || 'Em processamento'}
+      {isPending && remainingMin ? ` • expira em ${remainingMin} min` : ''}
     </span>
   );
 }
@@ -30,13 +52,14 @@ function StatusBadge({ status }) {
 // ---------------------------------------------------------------------------
 // Área do cliente logado: pedidos, favoritos e dados
 // ---------------------------------------------------------------------------
-export default function AccountArea({ auth, products = [], favoriteIds = [], renderProductCard, onToast }) {
+export default function AccountArea({ auth, products = [], favoriteIds = [], renderProductCard, onToast, onResumeOrder }) {
   const { user, profile, client, updateProfile, updatePassword, signOut } = auth;
   const [tab, setTab] = useState('orders');
 
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState('');
+  const [cancelingId, setCancelingId] = useState(null);
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -57,6 +80,17 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
       if (!client || !user) { setOrdersLoading(false); return; }
       setOrdersLoading(true);
       setOrdersError('');
+
+      // Dispara limpeza no banco de pedidos não pagos com mais de 30 minutos
+      try {
+        fetch('/api/asaas/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'cleanup' })
+        }).catch(() => {});
+        client.rpc('cleanup_expired_orders').then(() => {}).catch(() => {});
+      } catch { /* ignora */ }
+
       const { data, error } = await client
         .from('orders')
         .select('*')
@@ -73,16 +107,64 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
           o.user_id === user.id
           || (o.email && user.email && String(o.email).toLowerCase() === String(user.email).toLowerCase())
         ));
-        setOrders(mine);
+        // Separa pedidos expirados (> 30 min sem pagamento) e solicita exclusão no servidor
+        const expired = mine.filter((o) => isOrderExpired(o));
+        if (expired.length > 0) {
+          expired.forEach((exp) => {
+            fetch('/api/asaas/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'cancel', orderId: exp.id })
+            }).catch(() => {});
+            client.from('orders').delete().eq('id', exp.id).then(() => {}).catch(() => {});
+          });
+        }
+        const validOrders = mine.filter((o) => !isOrderExpired(o));
+        setOrders(validOrders);
       }
       setOrdersLoading(false);
     };
     load();
-    return () => { active = false; };
+
+    // Atualiza a cada 30s para remover automaticamente pedidos que vencerem os 30 min com a tela aberta
+    const timer = setInterval(() => {
+      setOrders((prev) => prev.filter((o) => !isOrderExpired(o)));
+    }, 30000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [client, user, tab === 'orders']); // eslint-disable-line
 
+  const handleCancelOrder = async (orderId) => {
+    if (!orderId || cancelingId) return;
+    setCancelingId(orderId);
+    try {
+      await fetch('/api/asaas/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', orderId })
+      }).catch(() => {});
+      if (client) {
+        await client.rpc('cancel_my_pending_order', { p_order_id: orderId }).catch(() => {});
+        await client.from('orders').delete().eq('id', orderId).catch(() => {});
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      onToast?.(`Pedido #${orderId} cancelado e removido.`);
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
   const favorites = useMemo(() => products.filter((p) => favoriteIds.includes(p.id)), [products, favoriteIds]);
-  const totalSpent = useMemo(() => orders.reduce((sum, o) => sum + Number(o.total || 0), 0), [orders]);
+  // Soma no "Total gasto" apenas pedidos efetivamente pagos/concluídos
+  const totalSpent = useMemo(
+    () => orders
+      .filter((o) => ['Pago', 'Enviado', 'Entregue'].includes(o.status))
+      .reduce((sum, o) => sum + Number(o.total || 0), 0),
+    [orders]
+  );
   const displayName = profile?.full_name || user?.user_metadata?.full_name || String(user?.email || '').split('@')[0];
 
   const handleSaveProfile = async (e) => {
@@ -181,13 +263,15 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
 
           {!ordersLoading && orders.map((order) => {
             const items = Array.isArray(order.items) ? order.items : [];
+            const pending = isPendingOrder(order);
+            const remainingMin = getRemainingMinutes(order);
             return (
               <div key={order.id} className="bg-[#FFF9F3] rounded-3xl border border-[#EBD5CF] p-4 sm:p-5 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-serif-display text-base font-bold text-[#4A2532]">#{order.id}</span>
-                      <StatusBadge status={order.status} />
+                      <StatusBadge status={order.status} remainingMin={remainingMin} />
                     </div>
                     <p className="text-[11px] text-[#9A7468] mt-1">
                       {order.date || (order.created_at ? new Date(order.created_at).toLocaleString('pt-BR') : '')}
@@ -215,14 +299,36 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
                     {order.delivery_method === 'pickup' ? <><Store className="w-3.5 h-3.5" />Retirada no ateliê</> : <><Truck className="w-3.5 h-3.5" />Entrega</>}
                   </span>
                   {order.address && <span className="text-[11px] text-[#9A7468] truncate max-w-[280px]">{order.address}</span>}
-                  <a
-                    href={`https://wa.me/5554999999999?text=${encodeURIComponent(`Olá! Gostaria de saber sobre o meu pedido ${order.id} na Mimo Rosas.`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#25D366] text-white text-[11px] font-semibold"
-                  >
-                    Falar sobre o pedido<ExternalLink className="w-3 h-3" />
-                  </a>
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    {pending && onResumeOrder && (
+                      <button
+                        type="button"
+                        onClick={() => onResumeOrder(order)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[11px] font-semibold transition-colors"
+                      >
+                        <QrCode className="w-3 h-3" />Pagar agora
+                      </button>
+                    )}
+                    {pending && (
+                      <button
+                        type="button"
+                        disabled={cancelingId === order.id}
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        {cancelingId === order.id ? 'Cancelando...' : 'Cancelar pedido'}
+                      </button>
+                    )}
+                    <a
+                      href={`https://wa.me/5554999999999?text=${encodeURIComponent(`Olá! Gostaria de saber sobre o meu pedido ${order.id} na Mimo Rosas.`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#25D366] text-white text-[11px] font-semibold"
+                    >
+                      Falar sobre o pedido<ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
                 </div>
               </div>
             );

@@ -147,7 +147,13 @@ create policy orders_update on public.orders
 drop policy if exists orders_delete on public.orders;
 create policy orders_delete on public.orders
   for delete to authenticated
-  using (public.is_admin());
+  using (
+    public.is_admin()
+    or (
+      (user_id = auth.uid() or (coalesce(email, '') <> '' and lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))))
+      and status in ('Aguardando PIX', 'Aguardando Pagamento')
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- 3.1) FUNÇÕES PÚBLICAS DE ACOMPANHAMENTO
@@ -207,6 +213,50 @@ as $$
   );
 $$;
 
+-- Remove automaticamente pedidos não pagos ("Aguardando PIX" / "Aguardando Pagamento") com mais de 30 minutos
+create or replace function public.cleanup_expired_orders()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted integer := 0;
+begin
+  delete from public.orders
+   where status in ('Aguardando PIX', 'Aguardando Pagamento')
+     and created_at < (now() - interval '30 minutes');
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
+-- Permite ao cliente cancelar imediatamente um pedido seu que ainda esteja aguardando pagamento
+create or replace function public.cancel_my_pending_order(p_order_id text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_deleted integer := 0;
+begin
+  delete from public.orders
+   where id = p_order_id
+     and status in ('Aguardando PIX', 'Aguardando Pagamento')
+     and (
+       (v_uid is not null and user_id = v_uid)
+       or (v_email <> '' and lower(coalesce(email, '')) = v_email)
+     );
+  get diagnostics v_deleted = row_count;
+  return v_deleted > 0;
+end;
+$$;
+
+grant execute on function public.cleanup_expired_orders() to anon, authenticated;
+grant execute on function public.cancel_my_pending_order(text) to authenticated;
 grant execute on function public.email_already_registered(text) to anon, authenticated;
 grant execute on function public.order_status(text) to anon, authenticated;
 grant execute on function public.claim_order_paid(text) to anon, authenticated;

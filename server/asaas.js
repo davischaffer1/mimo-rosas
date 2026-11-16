@@ -168,6 +168,43 @@ export async function updateOrderStatus(orderId, status) {
   }
 }
 
+// Remove pedidos não pagos ("Aguardando PIX" / "Aguardando Pagamento") com mais de X minutos
+export async function cleanupExpiredOrders(minutes = 30) {
+  if (!supabaseAdminConfigured()) return false;
+  try {
+    const cutoffIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+    const statuses = encodeURIComponent('("Aguardando PIX","Aguardando Pagamento")');
+    const response = await supabaseFetch(
+      `/orders?status=in.${statuses}&created_at=lt.${encodeURIComponent(cutoffIso)}`,
+      {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      }
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Cancela/remove um pedido específico desde que ainda esteja aguardando pagamento
+export async function deletePendingOrder(orderId) {
+  if (!isValidOrderId(orderId) || !supabaseAdminConfigured()) return false;
+  try {
+    const statuses = encodeURIComponent('("Aguardando PIX","Aguardando Pagamento")');
+    const response = await supabaseFetch(
+      `/orders?id=eq.${encodeURIComponent(String(orderId))}&status=in.${statuses}`,
+      {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      }
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Utilidades HTTP das functions
 // ---------------------------------------------------------------------------
