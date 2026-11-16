@@ -5,8 +5,12 @@ import {
   Sparkles, Send, MapPin, Truck, Store, CreditCard, QrCode,
   ShieldCheck, SlidersHorizontal, Settings, Package, ClipboardList,
   Database, Bot, Edit3, Copy, RefreshCw, Eye, Lock, CheckCircle2,
-  AlertCircle, ExternalLink, Upload, Image as ImageIcon, Camera
+  AlertCircle, ExternalLink, Upload, Image as ImageIcon, Camera,
+  Loader2, LogIn
 } from 'lucide-react';
+import { useAuth } from './auth/useAuth';
+import AuthPanel from './auth/AuthPanel';
+import AccountArea from './account/AccountArea';
 
 // ============================================================================
 // CONFIGURAÇÃO DO SUPABASE
@@ -337,6 +341,7 @@ export default function App() {
   });
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState('');
+  const [profilesProbed, setProfilesProbed] = useState(false);
 
   const [supabaseUrl, setSupabaseUrl] = useState(() => {
     try { return localStorage.getItem('mimo_sb_url') || DEFAULT_SUPABASE_URL; } catch { return DEFAULT_SUPABASE_URL; }
@@ -344,6 +349,9 @@ export default function App() {
   const [supabaseKey, setSupabaseKey] = useState(() => {
     try { return localStorage.getItem('mimo_sb_key') || DEFAULT_SUPABASE_ANON_KEY; } catch { return DEFAULT_SUPABASE_ANON_KEY; }
   });
+
+  // Autenticação (clientes + administração) via Supabase Auth
+  const auth = useAuth({ url: supabaseUrl, key: supabaseKey });
 
   const [sbStatus, setSbStatus] = useState({ connected: false, loading: false, message: 'Verificando conexão com o Supabase...' });
 
@@ -371,7 +379,17 @@ export default function App() {
     try { const s = localStorage.getItem('mimo_db_config'); return s ? { ...defaults, ...JSON.parse(s) } : defaults; } catch { return defaults; }
   });
 
-  const [activeView, setActiveView] = useState('home');
+  const [activeView, setActiveView] = useState(() => {
+    // Links diretos: /?conta=1, #conta e retornos do Supabase Auth
+    // (confirmação de e-mail, recuperação de senha)
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hash = String(window.location.hash || '').toLowerCase();
+      if (params.get('conta') === '1' || hash === '#conta') return 'account';
+      if (hash.includes('type=recovery') || hash.includes('type=signup') || hash.includes('error=')) return 'account';
+    } catch { /* ignora */ }
+    return 'home';
+  });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productQty, setProductQty] = useState(1);
@@ -489,6 +507,50 @@ export default function App() {
     setTimeout(() => setAdminToast(''), 3200);
   };
 
+  // ---------------------------------------------------------------------------
+  // Favoritos: localStorage para visitante, tabela `favorites` para quem tem conta
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    let active = true;
+    const syncFavorites = async () => {
+      if (!auth.client || !auth.user) return;
+      try {
+        const { data: rows, error } = await auth.client.from('favorites').select('product_id');
+        if (error || !active) return;
+        const remote = (rows || []).map((r) => r.product_id);
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem('mimo_rosas_favs') || '[]'); } catch { local = []; }
+
+        // Só mescla os favoritos do navegador se ainda não pertencerem a outra conta
+        // (evita que um cliente no mesmo computador veja a lista do anterior).
+        let owner = '';
+        try { owner = localStorage.getItem('mimo_rosas_favs_owner') || ''; } catch { owner = ''; }
+        const sameOwner = !owner || owner === auth.user.id;
+        const merged = sameOwner ? Array.from(new Set([...remote, ...local])) : remote;
+        const toInsert = merged.filter((id) => !remote.includes(id));
+        if (toInsert.length > 0) {
+          await auth.client.from('favorites').insert(toInsert.map((product_id) => ({ user_id: auth.user.id, product_id })));
+        }
+        try { localStorage.setItem('mimo_rosas_favs_owner', auth.user.id); } catch { /* ignora */ }
+        if (active) setFavorites(merged);
+      } catch { /* ignora */ }
+    };
+    syncFavorites();
+    return () => { active = false; };
+  }, [auth.client, auth.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Preenche o checkout com os dados da conta
+  useEffect(() => {
+    if (!auth.user) return;
+    const meta = auth.user.user_metadata || {};
+    setCheckoutData((prev) => ({
+      ...prev,
+      name: prev.name || auth.profile?.full_name || meta.full_name || '',
+      phone: prev.phone || auth.profile?.phone || meta.phone || '',
+      email: prev.email || auth.user.email || ''
+    }));
+  }, [auth.user?.id, auth.profile?.full_name, auth.profile?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ============================================================================
   // UPLOAD DE FOTOS
   // ============================================================================
@@ -565,7 +627,8 @@ export default function App() {
   // ============================================================================
   const sbHeaders = (prefer = 'return=representation') => ({
     apikey: supabaseKey.trim(),
-    Authorization: `Bearer ${supabaseKey.trim()}`,
+    // Com sessão ativa, o RLS enxerga o usuário (auth.uid()). Sem sessão, cai na chave pública.
+    Authorization: `Bearer ${(auth.accessToken || supabaseKey).trim()}`,
     'Content-Type': 'application/json',
     Prefer: prefer
   });
@@ -758,11 +821,16 @@ export default function App() {
         date: String(orderObj.date || orderObj.createdAt || new Date().toLocaleString('pt-BR')),
         items: Array.isArray(orderObj.items) ? orderObj.items : [],
         mp_payment_id: orderObj.mpPaymentId ? String(orderObj.mpPaymentId) : null,
-        mp_preference_id: orderObj.mpPreferenceId ? String(orderObj.mpPreferenceId) : null
+        mp_preference_id: orderObj.mpPreferenceId ? String(orderObj.mpPreferenceId) : null,
+        user_id: orderObj.userId || (auth.user ? auth.user.id : null)
       };
       for (let attempt = 0; attempt < 12; attempt++) {
-        const res = await fetch(`${cleanUrl}/rest/v1/orders`, { method: 'POST', headers: sbHeaders('resolution=merge-duplicates,return=representation'), body: JSON.stringify([currentPayload]) });
+        // return=minimal: com o RLS fechado o cliente anônimo não pode reler o pedido
+        // (RETURNING exigiria permissão de SELECT), então não pedimos a linha de volta.
+        const res = await fetch(`${cleanUrl}/rest/v1/orders`, { method: 'POST', headers: sbHeaders('return=minimal'), body: JSON.stringify([currentPayload]) });
         if (res.ok) return true;
+        // 409 = pedido já gravado com esse id
+        if (res.status === 409) return true;
         const errText = await res.text();
         const m = errText.match(/Could not find the '([^']+)' column/);
         if (m && m[1]) { const n = { ...currentPayload }; delete n[m[1]]; currentPayload = n; continue; }
@@ -774,6 +842,46 @@ export default function App() {
   };
 
   useEffect(() => { if (supabaseUrl && supabaseKey) fetchFromSupabase(true); }, []); // eslint-disable-line
+
+  // ---------------------------------------------------------------------------
+  // Status do pedido sem expor dados pessoais (função `order_status` no Supabase).
+  // Usado pelo acompanhamento de PIX/Mercado Pago, inclusive para visitantes.
+  // ---------------------------------------------------------------------------
+  const fetchOrderStatus = async (orderId) => {
+    if (!supabaseUrl || !supabaseKey || !orderId) return null;
+    try {
+      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/rpc/order_status`, {
+        method: 'POST',
+        headers: sbHeaders('return=representation'),
+        body: JSON.stringify({ p_order_id: String(orderId) })
+      });
+      if (!res.ok) return null;
+      const value = await res.json();
+      return typeof value === 'string' ? value : null;
+    } catch { return null; }
+  };
+
+  // Marca o próprio pedido como "Pago" (função `claim_order_paid`).
+  // Só funciona para o dono do pedido; visitantes são confirmados pela loja.
+  const markOwnOrderPaid = async (orderId) => {
+    if (!supabaseUrl || !supabaseKey || !orderId) return false;
+    try {
+      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/rpc/claim_order_paid`, {
+        method: 'POST',
+        headers: sbHeaders('return=representation'),
+        body: JSON.stringify({ p_order_id: String(orderId) })
+      });
+      if (!res.ok) return false;
+      return (await res.json()) === true;
+    } catch { return false; }
+  };
+
+  // Ao entrar como administradora, recarrega os dados que o RLS libera só para admin
+  useEffect(() => {
+    if (auth.isAdmin && appMode === 'admin') fetchFromSupabase(true);
+  }, [auth.isAdmin, appMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============================================================================
   // RETORNO DO CHECKOUT PRO MERCADO PAGO
@@ -890,7 +998,17 @@ export default function App() {
   };
   const toggleFavorite = (productId, e) => {
     if (e) e.stopPropagation();
+    const willAdd = !favorites.includes(productId);
     setFavorites((prev) => prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]);
+
+    if (auth.client && auth.user) {
+      const request = willAdd
+        ? auth.client.from('favorites').insert({ user_id: auth.user.id, product_id: productId })
+        : auth.client.from('favorites').delete().eq('user_id', auth.user.id).eq('product_id', productId);
+      Promise.resolve(request).then(({ error }) => {
+        if (error) console.warn('Favoritos (Supabase):', error.message);
+      });
+    }
   };
   const addToCart = (product, qty = 1, variation = null, e = null) => {
     if (e) e.stopPropagation();
@@ -1031,7 +1149,8 @@ export default function App() {
         customer: checkoutData.name.trim(),
         customerName: checkoutData.name.trim(),
         phone: checkoutData.phone.trim(),
-        email: (checkoutData.email || '').trim(),
+        email: (checkoutData.email || auth.user?.email || '').trim(),
+        userId: auth.user?.id || null,
         deliveryMethod: checkoutData.deliveryMethod,
         address: fullAddress,
         city: checkoutData.city || '',
@@ -1173,7 +1292,8 @@ export default function App() {
     if (!orderSuccess || (orderSuccess.method !== 'pix' && orderSuccess.method !== 'mercadopago') || orderSuccess.paymentConfirmed) return;
 
     const markOrderAsPaidAutomatically = async () => {
-      await handleUpdateOrderStatus(orderSuccess.code, 'Pago');
+      if (auth.isAdmin) await handleUpdateOrderStatus(orderSuccess.code, 'Pago');
+      else await markOwnOrderPaid(orderSuccess.code);
       const confirmedWaText = `Olá Mimo Rosas! 🌹 O sistema já confirmou automaticamente meu pagamento PIX do pedido *${orderSuccess.code}* (${formatBRL(orderSuccess.total)})!\n\n*Cliente:* ${orderSuccess.customer}`;
       setOrderSuccess((prev) => prev ? { ...prev, paymentConfirmed: true, whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}` } : null);
     };
@@ -1189,12 +1309,8 @@ export default function App() {
       // 2. Verifica no Supabase (Para quando o Admin marca como "Pago")
       if (supabaseUrl && supabaseKey) {
         try {
-          const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-          const res = await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderSuccess.code)}&select=status`, { headers: sbHeaders() });
-          if (res.ok) {
-            const rows = await res.json();
-            if (Array.isArray(rows) && rows[0]?.status === 'Pago') { await markOrderAsPaidAutomatically(); return; }
-          }
+          const remoteStatus = await fetchOrderStatus(orderSuccess.code);
+          if (remoteStatus === 'Pago') { await markOrderAsPaidAutomatically(); return; }
         } catch { /* ignora */ }
       }
 
@@ -1322,6 +1438,24 @@ export default function App() {
     );
   };
 
+  // Portão do painel: loading -> login -> permissão -> painel
+  // Antes do SQL rodar, cai na senha legada para não travar o acesso.
+  useEffect(() => {
+    if (appMode !== 'admin' || auth.loading || auth.user) return undefined;
+    let active = true;
+    Promise.resolve(auth.probeProfiles?.()).then(() => { if (active) setProfilesProbed(true); });
+    return () => { active = false; };
+  }, [appMode, auth.loading, auth.user, auth.probeProfiles]);
+
+  const adminGate = (() => {
+    if (auth.loading) return 'loading';
+    if (!auth.user && !profilesProbed) return 'loading';
+    // Banco ainda sem a tabela profiles: mantém o acesso legado por senha
+    if (!auth.profilesReady) return isAdminUnlocked ? 'open' : 'legacyPassword';
+    if (!auth.user) return 'login';
+    return auth.isAdmin ? 'open' : 'forbidden';
+  })();
+
   return (
     <div className="min-h-screen bg-[#F6E9E5] text-[#5A382E] flex flex-col items-center selection:bg-[#A90F4D] selection:text-white">
       <style>{`
@@ -1339,8 +1473,32 @@ export default function App() {
         .typing-dot:nth-child(3) { animation-delay: 0.3s; }
       `}</style>
 
+      {adminToast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-[60] max-w-[92vw] bg-[#2E7D32] text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+          <Check className="w-4 h-4 shrink-0" /><span>{adminToast}</span>
+        </div>
+      )}
+
       {appMode === 'admin' ? (
-        !isAdminUnlocked ? (
+        adminGate === 'loading' ? (
+          <div className="w-full min-h-screen flex flex-col items-center justify-center gap-3 text-[#A90F4D]">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <p className="text-xs text-[#795344]">Verificando acesso...</p>
+          </div>
+        ) : adminGate === 'login' ? (
+          <AuthPanel variant="admin" auth={auth} onBack={() => goToMode('store')} />
+        ) : adminGate === 'forbidden' ? (
+          <div className="w-full min-h-screen flex items-center justify-center p-4 font-sans-clean">
+            <div className="bg-[#FFF9F3] max-w-md w-full rounded-3xl p-6 border border-[#EAD6D0] shadow-xl text-center space-y-3">
+              <AlertCircle className="w-9 h-9 text-amber-600 mx-auto" />
+              <h2 className="font-serif-display text-xl font-bold text-[#4A2532]">Conta sem permissão de administrador</h2>
+              <p className="text-xs text-[#795344]">{auth.user?.email} está conectada, mas não tem acesso ao painel.</p>
+              <p className="text-[11px] text-[#9A7468]">Para liberar, rode no Supabase: <code className="break-all">update public.profiles set is_admin = true where id = (select id from auth.users where email = &apos;{auth.user?.email}&apos;);</code></p>
+              <button type="button" onClick={() => auth.signOut()} className="w-full py-3 rounded-full bg-[#A90F4D] text-white text-sm font-semibold">Sair e entrar com outra conta</button>
+              <button type="button" onClick={() => goToMode('store')} className="w-full py-2 rounded-full text-xs text-[#795344] hover:underline">Voltar para a loja</button>
+            </div>
+          </div>
+        ) : adminGate === 'legacyPassword' ? (
           <div className="w-full max-w-md my-auto p-6 font-sans-clean">
             <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EAD6D0] shadow-xl text-center space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-[#F6E9E5] text-[#A90F4D] flex items-center justify-center mx-auto"><Lock className="w-7 h-7" /></div>
@@ -1361,12 +1519,6 @@ export default function App() {
           </div>
         ) : (
           <div className="w-full max-w-7xl min-h-screen bg-[#F6E9E5] p-4 sm:p-6 lg:p-8 font-sans-clean space-y-6">
-            {adminToast && (
-              <div className="fixed bottom-5 right-5 z-50 bg-[#2E7D32] text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-semibold">
-                <Check className="w-4 h-4" /><span>{adminToast}</span>
-              </div>
-            )}
-
             <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-6 border border-[#EAD6D0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <MimoRoseOutlineSVG className="w-10 h-11" />
@@ -1382,6 +1534,7 @@ export default function App() {
                     try { localStorage.removeItem('mimo_admin_unlocked'); } catch { /* ignore */ }
                     setIsAdminUnlocked(false);
                     setAdminPinInput('');
+                    auth.signOut();
                     goToMode('store');
                   }}
                   className="px-4 py-2 rounded-full bg-[#FFF9F3] text-[#795344] border border-[#E5CFC9] text-xs font-semibold hover:bg-[#3A1C28] hover:text-white transition-colors"
@@ -1863,6 +2016,18 @@ export default function App() {
                     <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar produtos..." className="w-full pl-10 pr-4 py-2 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D] focus:bg-white transition-colors" />
                   </div>
                   <button type="button" onClick={() => setIsSearchOpen((prev) => !prev)} aria-label="Pesquisar produtos" className="lg:hidden p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Search className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} /></button>
+                  <button type="button" onClick={() => setActiveView('account')} aria-label="Minha conta" className="p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition flex items-center gap-1.5">
+                    {auth.user ? (
+                      <span className="w-7 h-7 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center">
+                        {String(auth.profile?.full_name || auth.user.email || 'M').trim().charAt(0).toUpperCase()}
+                      </span>
+                    ) : (
+                      <>
+                        <LogIn className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
+                        <span className="hidden xl:inline text-xs font-semibold">Entrar</span>
+                      </>
+                    )}
+                  </button>
                   <button type="button" onClick={() => setIsCartOpen(true)} aria-label="Abrir carrinho" className={`relative p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition ${cartBounce ? 'scale-125' : ''}`}>
                     <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
                     <span className="absolute top-0.5 right-0.5 min-w-[19px] h-[19px] px-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">{cartCount}</span>
@@ -2084,35 +2249,34 @@ export default function App() {
             )}
 
             {activeView === 'account' && (
-              <div className="mx-auto w-full max-w-[1000px] px-4 lg:px-8 py-4 lg:py-10 space-y-4 lg:space-y-6">
-                <div className="bg-[#FFF9F3] rounded-3xl p-5 lg:p-8 border border-[#EBD5CF] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-full bg-[#F6E9E5] border border-[#E2B8C4] flex items-center justify-center text-[#A90F4D]"><User className="w-7 h-7" /></div>
-                    <div>
-                      <h1 className="font-serif-display text-xl lg:text-2xl font-bold text-[#4A2532]">Espaço Cliente Mimo Rosas</h1>
-                      <p className="text-xs lg:text-sm text-[#795344]">Acompanhe seus favoritos e fale com a gente</p>
-                    </div>
+              auth.loading ? (
+                <div className="mx-auto w-full max-w-md px-4 py-16 flex flex-col items-center gap-3 text-[#A90F4D]">
+                  <Loader2 className="w-7 h-7 animate-spin" />
+                  <p className="text-xs text-[#795344]">Carregando sua conta...</p>
+                </div>
+              ) : !auth.user ? (
+                <div className="mx-auto w-full max-w-md px-4 py-8 lg:py-14">
+                  <AuthPanel variant="customer" auth={auth} embedded />
+                </div>
+              ) : auth.isAdmin ? (
+                <div className="mx-auto w-full max-w-md px-4 py-10">
+                  <div className="bg-[#FFF9F3] rounded-3xl p-6 border border-[#EAD6D0] shadow-xl text-center space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-[#3A1C28] text-[#FAD4E0] flex items-center justify-center mx-auto"><ShieldCheck className="w-7 h-7" /></div>
+                    <h2 className="font-serif-display text-xl font-bold text-[#4A2532]">Você está logada como administradora</h2>
+                    <p className="text-xs text-[#795344]">A área de cliente é separada do painel de gestão.</p>
+                    <button type="button" onClick={() => goToMode('admin')} className="w-full py-3 rounded-full bg-[#A90F4D] text-white text-sm font-semibold">Abrir Painel Administrativo</button>
+                    <button type="button" onClick={() => auth.signOut()} className="w-full py-2 rounded-full text-xs text-[#795344] hover:underline">Sair da conta</button>
                   </div>
                 </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <button type="button" onClick={() => setActiveView('favorites')} className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#A90F4D] hover:shadow-md transition-all">
-                    <span className="w-11 h-11 rounded-2xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center"><Heart className="w-5 h-5" /></span>
-                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Meus Favoritos</h2>
-                    <p className="text-xs text-[#795344] mt-1">{favorites.length} {favorites.length === 1 ? 'produto salvo' : 'produtos salvos'}</p>
-                  </button>
-                  <button type="button" onClick={() => setIsAssistantOpen(true)} className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#A90F4D] hover:shadow-md transition-all">
-                    <span className="w-11 h-11 rounded-2xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center"><Sparkles className="w-5 h-5" /></span>
-                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Atendimento Virtual</h2>
-                    <p className="text-xs text-[#795344] mt-1">Tire dúvidas sobre produtos e pedidos</p>
-                  </button>
-                  <a href={`https://wa.me/${String(storeConfig.whatsappNumber || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-left bg-[#FFF9F3] rounded-3xl p-5 border border-[#EBD5CF] hover:border-[#25D366] hover:shadow-md transition-all">
-                    <span className="w-11 h-11 rounded-2xl bg-[#EAF9EF] text-[#1EBE5B] flex items-center justify-center"><ShoppingCart className="w-5 h-5" /></span>
-                    <h2 className="font-serif-display text-base font-bold text-[#4A2532] mt-3">Falar no WhatsApp</h2>
-                    <p className="text-xs text-[#795344] mt-1">Atendimento humano direto com a loja</p>
-                  </a>
-                </div>
-              </div>
+              ) : (
+                <AccountArea
+                  auth={auth}
+                  products={visibleProducts}
+                  favoriteIds={favorites}
+                  renderProductCard={renderProductCard}
+                  onToast={showAdminToast}
+                />
+              )
             )}
 
             {activeView === 'checkout' && (
@@ -2164,15 +2328,11 @@ export default function App() {
                                   showAdminToast('Verificando pagamento...');
                                   if (supabaseUrl && supabaseKey) {
                                     try {
-                                      const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
-                                      const res = await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderSuccess.code)}&select=status`, { headers: sbHeaders() });
-                                      if (res.ok) {
-                                        const rows = await res.json();
-                                        if (Array.isArray(rows) && rows[0]?.status === 'Pago') {
-                                          await markOrderAsPaidAutomatically();
-                                          showAdminToast('Pagamento Confirmado!');
-                                          return;
-                                        }
+                                      const remoteStatus = await fetchOrderStatus(orderSuccess.code);
+                                      if (remoteStatus === 'Pago') {
+                                        await markOrderAsPaidAutomatically();
+                                        showAdminToast('Pagamento Confirmado!');
+                                        return;
                                       }
                                     } catch (e) {}
                                   }
@@ -2216,7 +2376,13 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input type="text" required value={checkoutData.name} onChange={(e) => setCheckoutData({ ...checkoutData, name: e.target.value })} placeholder="Seu nome completo *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
                         <input type="tel" required value={checkoutData.phone} onChange={(e) => setCheckoutData({ ...checkoutData, phone: e.target.value })} placeholder="WhatsApp (DDD) 99999-9999 *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
+                        <input type="email" required value={checkoutData.email} onChange={(e) => setCheckoutData({ ...checkoutData, email: e.target.value })} placeholder="E-mail para comprovantes e rastreio *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm sm:col-span-2" />
                       </div>
+                      {!auth.user && (
+                        <p className="text-[11px] text-[#795344]">
+                          Quer acompanhar este pedido na sua conta? <button type="button" onClick={() => setActiveView('account')} className="text-[#A90F4D] font-semibold hover:underline">Entre ou crie uma conta</button> com este mesmo e-mail.
+                        </p>
+                      )}
                     </div>
 
                     <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
