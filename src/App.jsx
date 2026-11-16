@@ -1244,6 +1244,68 @@ export default function App() {
     } catch { return false; }
   };
 
+  // Dispara e-mail automático de atualização de status do pedido via Resend (/api/asaas/config)
+  const notifyCustomerOrderStatusEmail = async (orderOrId, status) => {
+    try {
+      const code = typeof orderOrId === 'object' && orderOrId ? (orderOrId.id || orderOrId.code) : String(orderOrId || '');
+      if (!code || !status) return false;
+      const dedupKey = `mimo_email_sent_${code}_${status}`;
+      try {
+        if (localStorage.getItem(dedupKey) === '1') return false;
+      } catch { /* ignore */ }
+
+      let fullOrder = typeof orderOrId === 'object' && orderOrId?.email ? orderOrId : null;
+      if (!fullOrder) {
+        fullOrder = orders.find((o) => o.id === code) || null;
+      }
+      if (!fullOrder) {
+        try {
+          const saved = JSON.parse(localStorage.getItem('mimo_db_orders') || '[]');
+          fullOrder = saved.find((o) => o.id === code) || null;
+        } catch { /* ignore */ }
+      }
+      if (!fullOrder && supabaseUrl && supabaseKey) {
+        try {
+          const cleanUrl = supabaseUrl.trim().replace(/\/$/, '');
+          const res = await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(code)}&select=*&limit=1`, { headers: sbHeaders() });
+          if (res.ok) {
+            const rows = await res.json();
+            if (Array.isArray(rows) && rows[0]) fullOrder = rows[0];
+          }
+        } catch { /* ignore */ }
+      }
+      if (!fullOrder && auth.user?.email) {
+        fullOrder = {
+          id: code,
+          customer: orderSuccess?.customer || auth.profile?.full_name || 'Cliente Mimo Rosas',
+          email: auth.user.email,
+          total: orderSuccess?.total || 0,
+          items: []
+        };
+      }
+
+      const res = await fetch('/api/asaas/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'notify_order_status',
+          orderId: code,
+          order: fullOrder,
+          status,
+          resendApiKey: storeConfig.resendApiKey || '',
+          resendFrom: storeConfig.resendFromEmail || '',
+          siteOrigin: window.location.origin
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.ok) {
+        try { localStorage.setItem(dedupKey, '1'); } catch { /* ignore */ }
+        return true;
+      }
+    } catch { /* ignore */ }
+    return false;
+  };
+
   // Marca o pedido como "Pago" tanto na memória quanto no Supabase (via RPC do cliente, API e PATCH)
   const persistOrderPaidEverywhere = async (orderId) => {
     if (!orderId) return false;
@@ -1262,7 +1324,8 @@ export default function App() {
               headers: sbHeaders('return=minimal'),
               body: JSON.stringify({ status: 'Pago' })
             })
-          : Promise.resolve()
+          : Promise.resolve(),
+        notifyCustomerOrderStatusEmail(orderId, 'Pago')
       ]);
       return true;
     } catch {
@@ -1701,6 +1764,7 @@ export default function App() {
       }));
 
       await saveOrderToSupabase(newOrder);
+      notifyCustomerOrderStatusEmail(newOrder, newOrder.status);
 
       let pixCode = generatePixCopyPaste(storeConfig.pixKey || storeConfig.whatsappNumber, storeConfig.pixHolderName || 'MIMO ROSAS', 'BRASIL', cartTotal, code.replace(/[^A-Z0-9]/g, ''));
       let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
@@ -2085,6 +2149,7 @@ export default function App() {
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    const targetOrder = orders.find((o) => o.id === orderId);
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o));
     if (supabaseUrl && supabaseKey) {
       try {
@@ -2092,7 +2157,12 @@ export default function App() {
         await fetch(`${cleanUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, { method: 'PATCH', headers: sbHeaders(), body: JSON.stringify({ status: newStatus }) });
       } catch { /* ignore */ }
     }
-    showAdminToast(`Pedido #${orderId} atualizado para "${newStatus}"!`);
+    const emailSent = await notifyCustomerOrderStatusEmail(targetOrder || orderId, newStatus);
+    showAdminToast(
+      emailSent
+        ? `Pedido #${orderId} atualizado para "${newStatus}" e e-mail enviado para a cliente!`
+        : `Pedido #${orderId} atualizado para "${newStatus}"!`
+    );
   };
 
   const handleDeleteOrderAdmin = async (orderId) => {
@@ -3264,6 +3334,37 @@ export default function App() {
                             onChange={(e) => setStoreConfig({ ...storeConfig, pixHolderName: e.target.value })}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#F6E9E5]/70 border border-[#E5CFC9] space-y-3 text-xs">
+                        <div>
+                          <p className="font-bold text-[#4A2532]">E-mails Automáticos de Status do Pedido (Resend)</p>
+                          <p className="text-[11px] text-[#795344]">
+                            Envia automaticamente um e-mail personalizado da Mimo Rosas quando o cliente faz o pedido, quando o pagamento é confirmado e quando você muda para <em>Em Produção</em>, <em>Enviado</em> ou <em>Concluído</em>.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block font-semibold text-[#4A2532] mb-1">Chave de API do Resend (re_...)</label>
+                            <input
+                              type="password"
+                              placeholder="re_..."
+                              value={storeConfig.resendApiKey || ''}
+                              onChange={(e) => setStoreConfig({ ...storeConfig, resendApiKey: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[11px] text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-[#4A2532] mb-1">E-mail Remetente (verificado no Resend)</label>
+                            <input
+                              type="text"
+                              placeholder="Mimo Rosas <contato@seudominio.com.br>"
+                              value={storeConfig.resendFromEmail || ''}
+                              onChange={(e) => setStoreConfig({ ...storeConfig, resendFromEmail: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] text-xs text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                            />
+                          </div>
                         </div>
                       </div>
 
