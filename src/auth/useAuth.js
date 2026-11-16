@@ -124,8 +124,25 @@ export function useAuth({ url, key }) {
   // -------------------------------------------------------------------------
   const signUp = useCallback(async ({ email, password, fullName, phone }) => {
     if (!client) return { ok: false, error: 'Supabase não configurado.' };
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Verifica no banco se o e-mail já existe antes de chamar o signUp
+    // (se a função SQL ainda não tiver sido rodada no Supabase, segue normalmente para as travas abaixo)
+    try {
+      const { data: exists, error: rpcError } = await client.rpc('email_already_registered', {
+        p_email: cleanEmail
+      });
+      if (!rpcError && exists === true) {
+        return {
+          ok: false,
+          alreadyExists: true,
+          error: 'Este e-mail já possui conta cadastrada. Faça login ou clique em "Esqueci minha senha".'
+        };
+      }
+    } catch { /* ignora se a RPC ainda não existir */ }
+
     const { data, error } = await client.auth.signUp({
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       password,
       options: {
         data: { full_name: (fullName || '').trim(), phone: (phone || '').trim() },
@@ -133,6 +150,28 @@ export function useAuth({ url, key }) {
       }
     });
     if (error) return { ok: false, error: traduzirErro(error.message) };
+    // 1) Conta já existente e confirmada: o Supabase retorna `user.identities` vazio ([])
+    if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) {
+      return {
+        ok: false,
+        alreadyExists: true,
+        error: 'Este e-mail já possui conta cadastrada. Faça login ou clique em "Esqueci minha senha".'
+      };
+    }
+    // 2) Conta já existente ainda não confirmada: o Supabase reaproveita o registro antigo
+    //    (created_at anterior ao updated_at atual) em vez de retornar erro.
+    if (data?.user?.created_at && data?.user?.updated_at) {
+      const createdMs = new Date(data.user.created_at).getTime();
+      const updatedMs = new Date(data.user.updated_at).getTime();
+      if (!Number.isNaN(createdMs) && !Number.isNaN(updatedMs) && updatedMs - createdMs > 2500) {
+        return {
+          ok: false,
+          alreadyExists: true,
+          unconfirmed: true,
+          error: 'Este e-mail já foi cadastrado e aguarda confirmação. Confira sua caixa de entrada (e o spam) ou faça login.'
+        };
+      }
+    }
     // Sem sessão => confirmação de e-mail pendente
     return { ok: true, needsConfirmation: !data?.session, user: data?.user || null };
   }, [client]);

@@ -192,6 +192,22 @@ begin
 end;
 $$;
 
+-- Verifica se um e-mail já está cadastrado em auth.users (impede cadastro duplicado)
+create or replace function public.email_already_registered(p_email text)
+returns boolean
+language sql
+security definer
+set search_path = public, auth
+stable
+as $$
+  select exists (
+    select 1
+      from auth.users
+     where lower(email) = lower(trim(coalesce(p_email, '')))
+  );
+$$;
+
+grant execute on function public.email_already_registered(text) to anon, authenticated;
 grant execute on function public.order_status(text) to anon, authenticated;
 grant execute on function public.claim_order_paid(text) to anon, authenticated;
 

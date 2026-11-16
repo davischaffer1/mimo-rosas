@@ -18,6 +18,7 @@ export default function AuthPanel({ variant = 'customer', auth, onBack, onSucces
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [alreadyExistsError, setAlreadyExistsError] = useState(false);
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
@@ -28,6 +29,7 @@ export default function AuthPanel({ variant = 'customer', auth, onBack, onSucces
 
   const reset = (nextScreen) => {
     setError('');
+    setAlreadyExistsError(false);
     setInfo('');
     setPassword('');
     setPassword2('');
@@ -37,6 +39,7 @@ export default function AuthPanel({ variant = 'customer', auth, onBack, onSucces
   const handleSignIn = async (e) => {
     e.preventDefault();
     setError('');
+    setAlreadyExistsError(false);
     setSubmitting(true);
     const res = await auth.signIn({ email, password });
     setSubmitting(false);
@@ -47,13 +50,18 @@ export default function AuthPanel({ variant = 'customer', auth, onBack, onSucces
   const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
+    setAlreadyExistsError(false);
     if (password.length < 6) { setError('A senha precisa ter pelo menos 6 caracteres.'); return; }
     if (password !== password2) { setError('As senhas não conferem.'); return; }
     if (!fullName.trim()) { setError('Informe seu nome.'); return; }
     setSubmitting(true);
     const res = await auth.signUp({ email, password, fullName, phone });
     setSubmitting(false);
-    if (!res.ok) { setError(res.error); return; }
+    if (!res.ok) {
+      setError(res.error);
+      setAlreadyExistsError(Boolean(res.alreadyExists));
+      return;
+    }
 
     if (res.needsConfirmation) {
       setPendingEmail(email.trim().toLowerCase());
@@ -115,8 +123,20 @@ export default function AuthPanel({ variant = 'customer', auth, onBack, onSucces
       <p className="text-xs text-[#795344] mt-1 max-w-[340px] mx-auto">{subheading}</p>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 text-left bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>{error}</span>
+        <div className="mt-4 flex flex-col gap-2 text-left bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>{error}</span>
+          </div>
+          {alreadyExistsError && (
+            <div className="flex flex-wrap items-center gap-3 pl-6 pt-0.5">
+              <button type="button" onClick={() => reset('signin')} className="font-semibold text-[#A90F4D] hover:underline">
+                Ir para o Login →
+              </button>
+              <button type="button" onClick={() => reset('forgot')} className="text-[#795344] hover:text-[#A90F4D] hover:underline">
+                Esqueci minha senha
+              </button>
+            </div>
+          )}
         </div>
       )}
       {info && (
