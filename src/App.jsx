@@ -969,6 +969,32 @@ export default function App() {
     } catch { return false; }
   };
 
+  // Marca o pedido como "Pago" tanto na memória quanto no Supabase (via RPC do cliente, API e PATCH)
+  const persistOrderPaidEverywhere = async (orderId) => {
+    if (!orderId) return false;
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'Pago' } : o)));
+    try {
+      await Promise.allSettled([
+        markOwnOrderPaid(orderId),
+        fetch('/api/asaas/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'mark_paid', orderId: String(orderId) })
+        }),
+        supabaseUrl && supabaseKey
+          ? fetch(`${supabaseUrl.trim().replace(/\/$/, '')}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`, {
+              method: 'PATCH',
+              headers: sbHeaders('return=minimal'),
+              body: JSON.stringify({ status: 'Pago' })
+            })
+          : Promise.resolve()
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // Ao entrar como administradora, recarrega os dados que o RLS libera só para admin
   useEffect(() => {
     if (auth.isAdmin && appMode === 'admin') fetchFromSupabase(true);
@@ -978,6 +1004,7 @@ export default function App() {
   // RETORNO DO CHECKOUT PRO MERCADO PAGO
   // ============================================================================
   useEffect(() => {
+    if (auth.loading) return;
     const handleMercadoPagoReturn = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -1008,12 +1035,14 @@ export default function App() {
         const totalVal = foundOrder ? Number(foundOrder.total || 0) : Number(orderSuccess?.total || 0);
         const customerName = foundOrder ? (foundOrder.customerName || foundOrder.customer) : (orderSuccess?.customer || 'Cliente Mimo Rosas');
 
-        let isReallyApproved = collectionStatus === 'approved' || foundOrder?.status === 'Pago';
+        let isReallyApproved = collectionStatus === 'approved' || mpReturn === 'success' && collectionStatus === 'approved' || foundOrder?.status === 'Pago';
         if (!isReallyApproved && orderRef) {
           const mpCheck = await verifyOrderPaymentOnMercadoPago(orderRef, paymentId);
           if (mpCheck && mpCheck.status === 'approved') isReallyApproved = true;
         }
-        if (isReallyApproved && orderRef) await handleUpdateOrderStatus(orderRef, 'Pago');
+        if (isReallyApproved && orderRef) {
+          await persistOrderPaidEverywhere(orderRef);
+        }
 
         const pixCode = generatePixCopyPaste(storeConfig.pixKey || storeConfig.whatsappNumber, storeConfig.pixHolderName || 'MIMO ROSAS', 'BRASIL', totalVal || 1, (orderRef || 'MIMOROSAS').replace(/[^A-Z0-9]/g, ''));
 
@@ -1032,7 +1061,7 @@ export default function App() {
       } catch { /* ignora */ }
     };
     handleMercadoPagoReturn();
-  }, [supabaseUrl, supabaseKey]); // eslint-disable-line
+  }, [supabaseUrl, supabaseKey, auth.loading, auth.accessToken]); // eslint-disable-line
 
   useEffect(() => {
     if (activeView !== 'home' || appMode !== 'store') return;
@@ -1441,10 +1470,7 @@ export default function App() {
   // ============================================================================
   const markOrderAsPaidAutomatically = async (order = orderSuccess) => {
     if (!order) return;
-    try {
-      if (auth.isAdmin) await handleUpdateOrderStatus(order.code, 'Pago');
-      else await markOwnOrderPaid(order.code);
-    } catch { /* o webhook/consulta do Asaas já marcou no banco */ }
+    await persistOrderPaidEverywhere(order.code);
     const confirmedWaText = `Olá Mimo Rosas! 🌹 O sistema já confirmou automaticamente meu pagamento do pedido *${order.code}* (${formatBRL(order.total)})!\n\n*Cliente:* ${order.customer}`;
     setOrderSuccess((prev) => prev ? { ...prev, paymentConfirmed: true, whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}` } : null);
   };
@@ -2442,6 +2468,24 @@ export default function App() {
                   favoriteIds={favorites}
                   renderProductCard={renderProductCard}
                   onToast={showAdminToast}
+                  onCheckPendingOrder={async (order) => {
+                    if (!order?.id) return false;
+                    try {
+                      if (asaasConfig.enabled) {
+                        const asaasCheck = await verifyAsaasPayment(order.id);
+                        if (asaasCheck?.paid) {
+                          await persistOrderPaidEverywhere(order.id);
+                          return true;
+                        }
+                      }
+                      const mpCheck = await verifyOrderPaymentOnMercadoPago(order.id, order.mp_payment_id);
+                      if (mpCheck && mpCheck.status === 'approved') {
+                        await persistOrderPaidEverywhere(order.id);
+                        return true;
+                      }
+                    } catch { /* ignora */ }
+                    return false;
+                  }}
                   onResumeOrder={(order) => {
                     const code = order.id;
                     const total = Number(order.total || 0);

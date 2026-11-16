@@ -4,11 +4,12 @@ import {
   isProduction,
   cleanupExpiredOrders,
   deletePendingOrder,
+  updateOrderStatus,
   readJsonBody
 } from '../../server/asaas.js';
 
 // GET  /api/asaas/config -> informa se o pagamento online está pronto e limpa pedidos expirados (> 30 min)
-// POST /api/asaas/config -> permite cancelar um pedido ainda não pago ({ action: 'cancel', orderId })
+// POST /api/asaas/config -> permite cancelar pedido pendente ou confirmar pagamento no banco
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -17,6 +18,10 @@ export default async function handler(req, res) {
     if (body?.action === 'cancel' && body?.orderId) {
       const deleted = await deletePendingOrder(body.orderId);
       return res.status(200).json({ ok: deleted });
+    }
+    if (body?.action === 'mark_paid' && body?.orderId) {
+      const updated = await updateOrderStatus(body.orderId, 'Pago');
+      return res.status(200).json({ ok: updated });
     }
     if (body?.action === 'cleanup') {
       const cleaned = await cleanupExpiredOrders(30);

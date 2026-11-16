@@ -75,7 +75,7 @@ function StatusBadge({ status, remainingMin }) {
 // ---------------------------------------------------------------------------
 // Área do cliente logado: pedidos, favoritos e dados
 // ---------------------------------------------------------------------------
-export default function AccountArea({ auth, products = [], favoriteIds = [], renderProductCard, onToast, onResumeOrder }) {
+export default function AccountArea({ auth, products = [], favoriteIds = [], renderProductCard, onToast, onResumeOrder, onCheckPendingOrder }) {
   const { user, profile, client, updateProfile, updatePassword, signOut } = auth;
   const [tab, setTab] = useState('orders');
 
@@ -150,15 +150,41 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
         }
         const validOrders = mine.filter((o) => !isOrderExpired(o));
         setOrders(validOrders);
+
+        // Verifica imediatamente no Mercado Pago / Asaas se algum pedido "Aguardando PIX" já foi pago
+        if (onCheckPendingOrder) {
+          const pendingToVerify = validOrders.filter((o) => isPendingOrder(o));
+          pendingToVerify.forEach(async (pend) => {
+            try {
+              const paid = await onCheckPendingOrder(pend);
+              if (paid && active) {
+                setOrders((prev) => prev.map((o) => (o.id === pend.id ? { ...o, status: 'Pago' } : o)));
+              }
+            } catch { /* ignora */ }
+          });
+        }
       }
       setOrdersLoading(false);
     };
     load();
 
-    // Atualiza a cada 30s para remover automaticamente pedidos que vencerem os 30 min com a tela aberta
+    // Atualiza a cada 8s para remover expirados e checar se algum PIX pendente acabou de ser aprovado
     const timer = setInterval(() => {
-      setOrders((prev) => prev.filter((o) => !isOrderExpired(o)));
-    }, 30000);
+      setOrders((prev) => {
+        const filtered = prev.filter((o) => !isOrderExpired(o));
+        if (onCheckPendingOrder) {
+          filtered.filter((o) => isPendingOrder(o)).forEach(async (pend) => {
+            try {
+              const paid = await onCheckPendingOrder(pend);
+              if (paid && active) {
+                setOrders((curr) => curr.map((o) => (o.id === pend.id ? { ...o, status: 'Pago' } : o)));
+              }
+            } catch { /* ignora */ }
+          });
+        }
+        return filtered;
+      });
+    }, 8000);
 
     return () => {
       active = false;
