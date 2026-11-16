@@ -134,6 +134,11 @@ pedir CPF/CNPJ e mostra “Pagamento processado pelo Asaas”.**
 
 ## 5. Configurar o webhook no Asaas
 
+> ⚠️ **Faça o passo 4 (variáveis na Vercel + Redeploy) antes deste.** Enquanto a
+> `SUPABASE_SERVICE_ROLE_KEY` não existir, o site responde `503` para o Asaas de propósito — é o
+> pedido de "reenvie depois". Se o webhook for criado antes das variáveis, a fila do Asaas enche de
+> erros e pode ser pausada.
+
 No painel do Asaas: **Integrações → Webhooks → Adicionar** (ou *Configurações → Webhooks*).
 
 | Campo | Valor |
@@ -213,6 +218,7 @@ funcionando:
 | Pedido não vira "Pago" | Webhook com token errado ou URL errada | Confira a URL `/api/asaas/webhook` e o token |
 | QR Code vence no mesmo dia | Conta sem chave PIX cadastrada | Cadastre a chave PIX no Asaas |
 | Pedido pago continua pendente no painel | Service role key ausente | Configure `SUPABASE_SERVICE_ROLE_KEY` e redeploy |
+| Webhook retorna `503 save_failed` no log do Asaas | Idem: sem service role key (ou pedido inexistente) | Configure a chave; o Asaas reenvia sozinho depois |
 
 Para investigar: **Vercel → Deployments → Functions → logs** (`/api/asaas/create`, `/api/asaas/status`
 e `/api/asaas/webhook` registram erros) e **Asaas → Integrações → Webhooks → histórico de envios**.
