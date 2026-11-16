@@ -2,7 +2,7 @@
 
 Loja de presentes, aromas e sabores artesanais (chimarrão, chás e cafés) com vitrine e painel administrativo no mesmo app.
 
-Vite + React 18 + Tailwind (via CDN) + Supabase (opcional) + Mercado Pago (opcional).
+Vite + React 18 + Tailwind (via CDN) + Supabase (opcional) + Asaas (pagamento online).
 
 ## Rodando localmente
 
@@ -43,6 +43,18 @@ Resumo do que precisa ser feito uma única vez no Supabase:
     where id = (select id from auth.users where email = 'seu@email.com');
    ```
 
+## Pagamento online (Asaas)
+
+PIX com confirmação automática e cartão de crédito (até 3x) passam por funções na Vercel
+(`api/asaas/*`), que guardam a chave da API em segredo e recebem o aviso de pagamento por webhook.
+O pedido vira **Pago** sozinho — sem conferir comprovante no WhatsApp.
+
+Enquanto as variáveis de ambiente não estiverem configuradas, o checkout usa o fluxo antigo
+(PIX copia-e-cola manual) e o Mercado Pago fica como reserva, sem quebrar a loja.
+
+Passo a passo completo em **[`ASAAS_SETUP.md`](ASAAS_SETUP.md)** (conta Asaas, chave de API,
+webhook, variáveis na Vercel e checklist de teste).
+
 ## Rotas e deploy
 
 O site é uma SPA: a rota `/admin` precisa devolver o `index.html`. Já estão incluídos:
@@ -62,6 +74,8 @@ src/lib/supabaseClient.js      # cliente Supabase (sessão persistida)
 src/auth/useAuth.js            # sessão, perfil, login/cadastro/recuperação
 src/auth/AuthPanel.jsx         # telas de login/cadastro (cliente e admin)
 src/account/AccountArea.jsx    # pedidos, favoritos e dados do cliente
+server/asaas.js                # helpers do pagamento (Asaas + service role)
+api/asaas/                     # funções serverless (config, create, status, webhook)
 supabase/migrations/           # schema + RLS (rodar no SQL Editor)
 public/_redirects              # fallback SPA para Netlify
 vercel.json                    # fallback SPA para Vercel

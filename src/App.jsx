@@ -421,10 +421,12 @@ export default function App() {
   });
 
   const [checkoutData, setCheckoutData] = useState({
-    name: '', phone: '', email: '',
+    name: '', phone: '', email: '', document: '',
     cep: '', address: '', number: '', complement: '', neighborhood: '', city: '',
     notes: '', deliveryMethod: 'delivery', paymentMethod: 'pix'
   });
+  // Pagamento online via Asaas: o site pergunta ao servidor se as chaves já estão configuradas.
+  const [asaasConfig, setAsaasConfig] = useState({ enabled: false, env: null });
   const [orderSuccess, setOrderSuccess] = useState(() => {
     try { const s = localStorage.getItem('mimo_active_order'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
@@ -844,6 +846,43 @@ export default function App() {
   useEffect(() => { if (supabaseUrl && supabaseKey) fetchFromSupabase(true); }, []); // eslint-disable-line
 
   // ---------------------------------------------------------------------------
+  // Asaas: descobre se o pagamento online (PIX/cartão com confirmação
+  // automática) está ligado no servidor. Em `npm run dev` o /api não existe,
+  // então cai automaticamente no fluxo antigo.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/asaas/config', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive) setAsaasConfig({ enabled: Boolean(data?.enabled), env: data?.env || null });
+      } catch { /* dev local / offline: mantém desligado */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Link direto para o pedido em aberto: /?pedido=MR-12345
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const pedido = params.get('pedido');
+      if (pedido && orderSuccess?.code === pedido) setActiveView('checkout');
+    } catch { /* ignora */ }
+  }, []); // eslint-disable-line
+
+  // Consulta o Asaas pelo status do pedido (usado na tela de acompanhamento).
+  const verifyAsaasPayment = async (orderCode) => {
+    if (!orderCode) return null;
+    try {
+      const res = await fetch(`/api/asaas/status?order=${encodeURIComponent(orderCode)}`, { cache: 'no-store' });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch { return null; }
+  };
+
+  // ---------------------------------------------------------------------------
   // Status do pedido sem expor dados pessoais (função `order_status` no Supabase).
   // Usado pelo acompanhamento de PIX/Mercado Pago, inclusive para visitantes.
   // ---------------------------------------------------------------------------
@@ -1066,7 +1105,7 @@ export default function App() {
           'Claro, estou aqui para ajudar 💕 Dúvidas frequentes:\n\n' +
           '🚚 *Frete:* ' + formatBRL(storeConfig.defaultShippingFee || 14.9) + ' (grátis acima de ' + formatBRL(storeConfig.freeShippingMin || 120) + ')\n' +
           '⏱️ *Prazo:* Produção artesanal de 2 a 5 dias úteis + envio\n' +
-          '💳 *Pagamento:* PIX, Cartão de Crédito e Mercado Pago\n' +
+          '💳 *Pagamento:* PIX e Cartão de Crédito\n' +
           '📦 *Embalagem:* Todo pedido vai com embalagem presenteável\n\n' +
           'Se tiver outra dúvida é só me perguntar!';
       } else if (optionType === 'pedidos') {
@@ -1106,7 +1145,7 @@ export default function App() {
       } else if (lower.includes('pix')) {
         botReply = 'Aceitamos PIX! O QR Code é gerado automaticamente no checkout e a confirmação é automática. 💚';
       } else if (['cartão', 'cartao', 'parcel', 'crédito', 'credito'].some((k) => lower.includes(k))) {
-        botReply = 'Aceitamos Cartão de Crédito em até 3x sem juros pelo Checkout Pro Mercado Pago! 💳';
+        botReply = 'Aceitamos Cartão de Crédito em até 3x sem juros pelo checkout seguro! 💳';
       } else if (['preço', 'preco', 'valor', 'quanto'].some((k) => lower.includes(k))) {
         botReply = 'Nossos produtos vão de R$ 14,90 (enfeites) até R$ 129,90 (cuias personalizadas). O que você procura? 🌹';
       } else if (['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'].some((k) => lower.includes(k))) {
@@ -1134,6 +1173,16 @@ export default function App() {
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (!checkoutData.name.trim() || !checkoutData.phone.trim() || isSubmittingCheckout) return;
+
+    // O Asaas exige CPF/CNPJ do pagador para emitir a cobrança.
+    if (asaasConfig.enabled) {
+      const docDigits = String(checkoutData.document || '').replace(/\D/g, '');
+      if (docDigits.length !== 11 && docDigits.length !== 14) {
+        showAdminToast('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) para o pagamento online.');
+        return;
+      }
+    }
+
     setIsSubmittingCheckout(true);
 
     try {
@@ -1157,7 +1206,9 @@ export default function App() {
         cep: checkoutData.cep || '-',
         notes: checkoutData.notes || '',
         paymentMethod: checkoutData.paymentMethod,
-        status: 'Aguardando PIX',
+        // "Aguardando Pagamento" só no cartão do Asaas. No fluxo antigo (Mercado Pago)
+        // o status continua "Aguardando PIX", que é o que a sincronização do painel filtra.
+        status: (asaasConfig.enabled && checkoutData.paymentMethod !== 'pix') ? 'Aguardando Pagamento' : 'Aguardando PIX',
         total: Number(cartTotal.toFixed(2)),
         shipping: Number(shippingFee.toFixed(2)),
         date: nowFormatted,
@@ -1187,14 +1238,54 @@ export default function App() {
       let mpPaymentId = null;
       let mpCheckoutProUrl = null;
       let mpPreferenceId = null;
-      
+      let asaasPaymentId = null;
+      let asaasInvoiceUrl = null;
+      let asaasConfirmed = false;
+
       const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
       const hasMpToken = activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-');
 
       // ==========================================
-      // FLUXO 1: CARTÃO DE CRÉDITO (CHECKOUT PRO)
+      // FLUXO PRINCIPAL: ASAAS (PIX e cartão com confirmação automática)
       // ==========================================
-      if (checkoutData.paymentMethod === 'mercadopago' && hasMpToken) {
+      if (asaasConfig.enabled) {
+        try {
+          const payRes = await fetch('/api/asaas/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: code,
+              billingType: checkoutData.paymentMethod === 'pix' ? 'PIX' : 'CARD',
+              cpfCnpj: checkoutData.document
+            })
+          });
+          const payData = await payRes.json().catch(() => null);
+
+          if (payRes.ok && payData?.ok) {
+            asaasPaymentId = payData.paymentId || null;
+            asaasConfirmed = Boolean(payData.alreadyPaid);
+            if (payData.billingType === 'PIX' && payData.pix?.payload) {
+              // QR Code oficial do Asaas: confirma sozinho quando a cliente paga.
+              pixCode = payData.pix.payload;
+              qrCodeUrl = payData.pix.encodedImage
+                ? `data:image/png;base64,${payData.pix.encodedImage}`
+                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+            } else if (payData.billingType === 'UNDEFINED') {
+              asaasInvoiceUrl = payData.invoiceUrl || null;
+            }
+          } else if (payData?.message) {
+            showAdminToast(payData.message);
+          }
+        } catch {
+          showAdminToast('Pagamento online indisponível agora. Use o PIX abaixo ou fale com a loja no WhatsApp.');
+        }
+      }
+
+      // ==========================================
+      // FLUXO ALTERNATIVO: CARTÃO VIA MERCADO PAGO
+      // (usado apenas enquanto o Asaas não estiver configurado)
+      // ==========================================
+      if (!asaasConfig.enabled && checkoutData.paymentMethod !== 'pix' && hasMpToken) {
         try {
           const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
           const mpItems = cart.map((item) => ({
@@ -1251,9 +1342,9 @@ export default function App() {
         } catch (err) { console.error("Erro MP Pref:", err); }
       }
 
-      // FLUXO 2 (PIX DIRETO): A API do Mercado Pago bloqueia requisições POST via browser (CORS).
-      // Por isso, usamos o código PIX estático gerado acima, que é 100% seguro e funcional.
-      // O status será atualizado automaticamente via polling do Supabase.
+      // PIX: quando o Asaas está ligado, o código acima já é o QR Code oficial e
+      // o pagamento se confirma sozinho (webhook + consulta automática).
+      // Sem Asaas, mantém o PIX estático da loja como reserva.
 
       const itemsSummaryText = newOrder.items.map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`).join('\n');
       const waMessage =
@@ -1261,15 +1352,16 @@ export default function App() {
         `*Cliente:* ${checkoutData.name}\n` +
         `*Telefone:* ${checkoutData.phone}\n` +
         `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
-        `*Pagamento:* ${checkoutData.paymentMethod === 'mercadopago' ? 'Cartão de Crédito' : 'PIX'}\n\n` +
+        `*Pagamento:* ${checkoutData.paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}\n\n` +
         `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
         `*Total:* ${formatBRL(cartTotal)}`;
 
       const successObj = {
         code, customer: checkoutData.name, total: cartTotal,
         method: checkoutData.paymentMethod, delivery: checkoutData.deliveryMethod,
-        paymentConfirmed: false,
+        paymentConfirmed: asaasConfirmed,
         mpPaymentId, mpPreferenceId, mpCheckoutProUrl, pixCode, qrCodeUrl,
+        asaasPaymentId, asaasInvoiceUrl,
         whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`
       };
       setPixCheckCount(0);
@@ -1277,8 +1369,11 @@ export default function App() {
       try { localStorage.setItem('mimo_active_order', JSON.stringify(successObj)); } catch { /* ignore */ }
       setCart([]);
 
-      if (checkoutData.paymentMethod === 'mercadopago' && mpCheckoutProUrl) {
+      if (mpCheckoutProUrl) {
         window.location.href = mpCheckoutProUrl;
+      } else if (asaasInvoiceUrl) {
+        // A fatura do Asaas abre em outra aba para a cliente não perder o pedido de vista.
+        try { window.open(asaasInvoiceUrl, '_blank', 'noopener'); } catch { /* bloqueado: o botão na tela resolve */ }
       }
     } finally {
       setIsSubmittingCheckout(false);
@@ -1286,27 +1381,44 @@ export default function App() {
   };
 
   // ============================================================================
+  // CONFIRMAÇÃO AUTOMÁTICA DO PAGAMENTO
+  // Fica no escopo do componente porque o botão "Já pagou?" também usa.
+  // ============================================================================
+  const markOrderAsPaidAutomatically = async (order = orderSuccess) => {
+    if (!order) return;
+    try {
+      if (auth.isAdmin) await handleUpdateOrderStatus(order.code, 'Pago');
+      else await markOwnOrderPaid(order.code);
+    } catch { /* o webhook/consulta do Asaas já marcou no banco */ }
+    const confirmedWaText = `Olá Mimo Rosas! 🌹 O sistema já confirmou automaticamente meu pagamento do pedido *${order.code}* (${formatBRL(order.total)})!\n\n*Cliente:* ${order.customer}`;
+    setOrderSuccess((prev) => prev ? { ...prev, paymentConfirmed: true, whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}` } : null);
+  };
+
+  // ============================================================================
   // POLLING AUTOMÁTICO DE PIX + VISIBILITY CHANGE
   // ============================================================================
   useEffect(() => {
-    if (!orderSuccess || (orderSuccess.method !== 'pix' && orderSuccess.method !== 'mercadopago') || orderSuccess.paymentConfirmed) return;
-
-    const markOrderAsPaidAutomatically = async () => {
-      if (auth.isAdmin) await handleUpdateOrderStatus(orderSuccess.code, 'Pago');
-      else await markOwnOrderPaid(orderSuccess.code);
-      const confirmedWaText = `Olá Mimo Rosas! 🌹 O sistema já confirmou automaticamente meu pagamento PIX do pedido *${orderSuccess.code}* (${formatBRL(orderSuccess.total)})!\n\n*Cliente:* ${orderSuccess.customer}`;
-      setOrderSuccess((prev) => prev ? { ...prev, paymentConfirmed: true, whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(confirmedWaText)}` } : null);
-    };
+    const payableMethods = ['pix', 'card', 'mercadopago'];
+    if (!orderSuccess || !payableMethods.includes(orderSuccess.method) || orderSuccess.paymentConfirmed) return;
 
     const checkPayment = async () => {
       setPixCheckCount((c) => c + 1);
-      // 1. Verifica no Mercado Pago (GET, geralmente permitido)
-      try {
-        const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
-        if (mpCheck && mpCheck.status === 'approved') { await markOrderAsPaidAutomatically(); return; }
-      } catch (e) { /* ignora erro CORS do MP */ }
 
-      // 2. Verifica no Supabase (Para quando o Admin marca como "Pago")
+      // 1. Asaas (PIX e cartão): o servidor pergunta ao Asaas e já marca como Pago
+      if (asaasConfig.enabled || orderSuccess.asaasPaymentId) {
+        const asaasCheck = await verifyAsaasPayment(orderSuccess.code);
+        if (asaasCheck?.paid) { await markOrderAsPaidAutomatically(); return; }
+      }
+
+      // 2. Mercado Pago (só no fluxo antigo, enquanto o Asaas não estiver ligado)
+      if (!asaasConfig.enabled) {
+        try {
+          const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
+          if (mpCheck && mpCheck.status === 'approved') { await markOrderAsPaidAutomatically(); return; }
+        } catch (e) { /* ignora erro CORS do MP */ }
+      }
+
+      // 3. Verifica no Supabase (webhook do Asaas ou admin marcando "Pago" na mão)
       if (supabaseUrl && supabaseKey) {
         try {
           const remoteStatus = await fetchOrderStatus(orderSuccess.code);
@@ -1314,14 +1426,14 @@ export default function App() {
         } catch { /* ignora */ }
       }
 
-      // 3. Simulador de testes (Se ativado no admin)
+      // 4. Simulador de testes (Se ativado no admin)
       const demoSecs = Number(storeConfig.autoApproveDemoSeconds || 0);
       if (demoSecs > 0) {
         setPixCheckCount((currentCount) => { if (currentCount * 3 >= demoSecs) markOrderAsPaidAutomatically(); return currentCount; });
       }
     };
 
-    const interval = setInterval(checkPayment, 3000);
+    const interval = setInterval(checkPayment, asaasConfig.enabled ? 4000 : 3000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') checkPayment();
@@ -1334,7 +1446,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [orderSuccess, supabaseUrl, supabaseKey, storeConfig]); // eslint-disable-line
+  }, [orderSuccess, supabaseUrl, supabaseKey, storeConfig, asaasConfig]); // eslint-disable-line
 
   const syncAllPendingOrdersWithMercadoPago = async (silent = false) => {
     const pendingList = orders.filter((o) => o.status === 'Aguardando PIX' || o.status === 'Pendente');
@@ -2294,7 +2406,7 @@ export default function App() {
                       <div className="flex justify-center"><span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold animate-pulse"><QrCode className="w-4 h-4 text-amber-700" />Aguardando Pagamento • Pedido #{orderSuccess.code}</span></div>
                     )}
                     <h2 className="font-serif-display text-2xl text-[#4A2532] font-bold">
-                      {orderSuccess.paymentConfirmed ? 'Pagamento Confirmado com Sucesso! 🌹' : orderSuccess.mpCheckoutProUrl ? 'Pague com Segurança no Checkout Pro Mercado Pago 🌹' : 'Escaneie o QR Code PIX para Pagar 🌹'}
+                      {orderSuccess.paymentConfirmed ? 'Pagamento Confirmado com Sucesso! 🌹' : orderSuccess.mpCheckoutProUrl ? 'Pague com Segurança no Checkout Pro Mercado Pago 🌹' : orderSuccess.asaasInvoiceUrl ? 'Pague com Cartão de Crédito com Segurança 🌹' : 'Escaneie o QR Code PIX para Pagar 🌹'}
                     </h2>
                     <p className="text-xs text-[#795344] max-w-md mx-auto">
                       Obrigada, <strong>{orderSuccess.customer}</strong>! Seu pedido <strong className="text-[#A90F4D]">{orderSuccess.code}</strong> {orderSuccess.total > 0 && (<>no valor de <strong>{formatBRL(orderSuccess.total)}</strong> </>)}já está salvo no sistema.
@@ -2306,7 +2418,14 @@ export default function App() {
                         <p className="text-[11px] text-[#005B8F]">Assim que você pagar lá, o Mercado Pago te traz de volta para cá com o pedido aprovado automaticamente!</p>
                       </div>
                     )}
-                    {(orderSuccess.method === 'pix' || orderSuccess.method === 'mercadopago') && orderSuccess.pixCode && (
+                    {!orderSuccess.paymentConfirmed && orderSuccess.asaasInvoiceUrl && (
+                      <div className="bg-[#F0FAF4] p-4 rounded-3xl border-2 border-[#0E9F6E] max-w-md mx-auto space-y-2.5">
+                        <p className="text-xs font-bold text-[#046C4E]">Pagamento seguro em ambiente Asaas (Cartão de Crédito em até 3x, PIX ou boleto)</p>
+                        <a href={orderSuccess.asaasInvoiceUrl} target="_blank" rel="noreferrer" className="w-full py-3.5 px-5 rounded-full bg-[#0E9F6E] hover:bg-[#0B875D] text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition"><CreditCard className="w-5 h-5" /><span>Abrir Pagamento Seguro →</span></a>
+                        <p className="text-[11px] text-[#046C4E]">Se a aba não abriu, use o botão acima. Esta tela confirma sozinha assim que o pagamento for aprovado — pode deixá-la aberta.</p>
+                      </div>
+                    )}
+                    {!orderSuccess.asaasInvoiceUrl && orderSuccess.pixCode && ['pix', 'card', 'mercadopago'].includes(orderSuccess.method) && (
                       <div className="bg-[#F6E9E5] p-4 sm:p-5 rounded-3xl border border-[#DFC3BC] max-w-md mx-auto space-y-3.5">
                         {!orderSuccess.paymentConfirmed ? (
                           <>
@@ -2320,12 +2439,23 @@ export default function App() {
                                 <button type="button" onClick={() => safeCopyText(orderSuccess.pixCode, 'Código PIX Copia e Cola')} className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs"><Copy className="w-3 h-3" /> Copiar Código PIX</button>
                               </div>
                               <input type="text" readOnly value={orderSuccess.pixCode} onClick={(e) => e.target.select()} className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[10px] text-[#4A2532]" />
-                              <p className="text-[11px] text-[#795344] text-center pt-0.5">Recebedor: <strong>{storeConfig.pixHolderName || 'Mimo Rosas'}</strong> • Chave: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong></p>
+                              {!orderSuccess.asaasPaymentId && (
+                                <p className="text-[11px] text-[#795344] text-center pt-0.5">Recebedor: <strong>{storeConfig.pixHolderName || 'Mimo Rosas'}</strong> • Chave: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong></p>
+                              )}
+                              {orderSuccess.asaasPaymentId && (
+                                <p className="text-[11px] text-emerald-800 text-center pt-0.5 font-semibold">PIX oficial Mimo Rosas • confirmação automática</p>
+                              )}
                             </div>
                             <div className="pt-2 border-t border-[#E5CFC9]">
                               <button 
                                 onClick={async () => {
                                   showAdminToast('Verificando pagamento...');
+                                  const asaasCheck = await verifyAsaasPayment(orderSuccess.code);
+                                  if (asaasCheck?.paid) {
+                                    await markOrderAsPaidAutomatically();
+                                    showAdminToast('Pagamento Confirmado!');
+                                    return;
+                                  }
                                   if (supabaseUrl && supabaseKey) {
                                     try {
                                       const remoteStatus = await fetchOrderStatus(orderSuccess.code);
@@ -2336,13 +2466,15 @@ export default function App() {
                                       }
                                     } catch (e) {}
                                   }
-                                  const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
-                                  if (mpCheck && mpCheck.status === 'approved') {
-                                     await markOrderAsPaidAutomatically();
-                                     showAdminToast('Pagamento Confirmado!');
-                                  } else {
-                                     showAdminToast('Ainda não identificamos o pagamento. Aguarde alguns minutos.');
+                                  if (!asaasConfig.enabled) {
+                                    const mpCheck = await verifyOrderPaymentOnMercadoPago(orderSuccess.code, orderSuccess.mpPaymentId);
+                                    if (mpCheck && mpCheck.status === 'approved') {
+                                      await markOrderAsPaidAutomatically();
+                                      showAdminToast('Pagamento Confirmado!');
+                                      return;
+                                    }
                                   }
+                                  showAdminToast('Ainda não identificamos o pagamento. Aguarde alguns instantes.');
                                 }}
                                 className="w-full py-3 px-4 rounded-2xl bg-[#FFF9F3] hover:bg-white border border-[#DFC3BC] text-[#4A2532] text-xs font-semibold flex items-center justify-center gap-2.5 shadow-2xs transition-colors cursor-pointer"
                               >
@@ -2354,7 +2486,7 @@ export default function App() {
                         ) : (
                           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-2">
                             <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                            <p className="text-sm font-bold">Pagamento PIX identificado automaticamente!</p>
+                            <p className="text-sm font-bold">Pagamento confirmado automaticamente!</p>
                             <p className="text-xs text-emerald-800">O sistema reconheceu o pagamento e o pedido <strong>#{orderSuccess.code}</strong> já está com status <strong>Pago</strong> na Mimo Rosas.</p>
                           </div>
                         )}
@@ -2377,6 +2509,20 @@ export default function App() {
                         <input type="text" required value={checkoutData.name} onChange={(e) => setCheckoutData({ ...checkoutData, name: e.target.value })} placeholder="Seu nome completo *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
                         <input type="tel" required value={checkoutData.phone} onChange={(e) => setCheckoutData({ ...checkoutData, phone: e.target.value })} placeholder="WhatsApp (DDD) 99999-9999 *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
                         <input type="email" required value={checkoutData.email} onChange={(e) => setCheckoutData({ ...checkoutData, email: e.target.value })} placeholder="E-mail para comprovantes e rastreio *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm sm:col-span-2" />
+                        {asaasConfig.enabled && (
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              required
+                              value={checkoutData.document}
+                              onChange={(e) => setCheckoutData({ ...checkoutData, document: e.target.value })}
+                              placeholder="CPF ou CNPJ do pagador *"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                            />
+                            <p className="text-[10px] text-[#795344] pt-1">Exigido pelo banco para emitir o PIX/cartão. Não aparece para ninguém.</p>
+                          </div>
+                        )}
                       </div>
                       {!auth.user && (
                         <p className="text-[11px] text-[#795344]">
@@ -2429,29 +2575,39 @@ export default function App() {
                           </div>
                         </button>
 
-                        {/* BOTÃO CARTÃO (CHECKOUT PRO) */}
+                        {/* BOTÃO CARTÃO (ASAAS OU CHECKOUT PRO MERCADO PAGO) */}
                         <button
                           type="button"
-                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'mercadopago' })}
+                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: asaasConfig.enabled ? 'card' : 'mercadopago' })}
                           className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
-                            checkoutData.paymentMethod === 'mercadopago'
-                              ? 'border-[#009EE3] bg-[#F0F9FF] shadow-sm'
-                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#009EE3]/50'
+                            ['card', 'mercadopago'].includes(checkoutData.paymentMethod)
+                              ? (asaasConfig.enabled ? 'border-[#0E9F6E] bg-[#F0FAF4] shadow-sm' : 'border-[#009EE3] bg-[#F0F9FF] shadow-sm')
+                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#0E9F6E]/50'
                           }`}
                         >
                           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-xs">
-                            <CreditCard className="w-5 h-5 text-[#009EE3]" />
+                            <CreditCard className={`w-5 h-5 ${asaasConfig.enabled ? 'text-[#0E9F6E]' : 'text-[#009EE3]'}`} />
                           </div>
                           <div className="text-left">
-                            <span className="text-xs font-bold block text-[#005B8F]">Cartão de Crédito</span>
-                            <span className="text-[10px] text-[#795344]">Checkout Seguro Mercado Pago</span>
+                            <span className={`text-xs font-bold block ${asaasConfig.enabled ? 'text-[#046C4E]' : 'text-[#005B8F]'}`}>Cartão de Crédito</span>
+                            <span className="text-[10px] text-[#795344]">{asaasConfig.enabled ? 'Pix, cartão ou boleto • Asaas' : 'Checkout Seguro Mercado Pago'}</span>
                           </div>
                         </button>
                       </div>
 
-                      <button type="submit" disabled={isSubmittingCheckout} className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 ${checkoutData.paymentMethod === 'mercadopago' ? 'bg-[#009EE3] hover:bg-[#0082BD]' : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'}`}>
-                        {isSubmittingCheckout ? 'Salvando pedido e conectando...' : checkoutData.paymentMethod === 'mercadopago' ? `Pagar com Cartão • ${formatBRL(cartTotal)}` : `Gerar QR Code PIX • ${formatBRL(cartTotal)}`}
+                      <button type="submit" disabled={isSubmittingCheckout} className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 ${['card', 'mercadopago'].includes(checkoutData.paymentMethod) ? (asaasConfig.enabled ? 'bg-[#0E9F6E] hover:bg-[#0B875D]' : 'bg-[#009EE3] hover:bg-[#0082BD]') : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'}`}>
+                        {isSubmittingCheckout
+                          ? 'Salvando pedido e conectando...'
+                          : ['card', 'mercadopago'].includes(checkoutData.paymentMethod)
+                            ? `Pagar com Cartão • ${formatBRL(cartTotal)}`
+                            : `Gerar QR Code PIX • ${formatBRL(cartTotal)}`}
                       </button>
+                      {asaasConfig.enabled && (
+                        <p className="text-[10px] text-center text-[#795344] flex items-center justify-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                          Pagamento processado pelo Asaas • confirmação automática
+                        </p>
+                      )}
                     </div>
                   </form>
                 )}
