@@ -104,13 +104,25 @@ Credenciais SMTP do Resend:
 
 3. Salve. Use o botão de **envio de teste** se aparecer.
 
-### 2.4 Conferir os modelos de e-mail
+### 2.4 Personalizar a logo e o corpo dos e-mails (Mimo Rosas)
 
-Em **Authentication → Emails → Templates**, revise:
+O Resend envia os e-mails, mas **o visual (logo, cores e texto do corpo)** fica configurado dentro do Supabase em **Authentication → Emails → Templates**.
 
-- **Confirm signup** — precisa conter `{{ .ConfirmationURL }}`
-- **Reset password** — idem
-- Assunto sugerido: `Confirme seu e-mail • Mimo Rosas`
+Já deixamos a logo oficial (`public/email-logo.png`) e os 4 modelos HTML prontos na pasta [`supabase/email-templates/`](supabase/email-templates/) com as cores, fontes e cabeçalho da **Mimo Rosas**:
+
+| Aba no Supabase (`Authentication → Emails → Templates`) | Assunto (*Subject heading*) | Arquivo HTML para colar no *Message body (Source)* |
+| --- | --- | --- |
+| **Confirm signup** | `Confirme seu cadastro • Mimo Rosas 🌹` | [`supabase/email-templates/confirm-signup.html`](supabase/email-templates/confirm-signup.html) |
+| **Reset password** | `Recuperação de senha • Mimo Rosas` | [`supabase/email-templates/reset-password.html`](supabase/email-templates/reset-password.html) |
+| **Magic Link** | `Seu link de acesso • Mimo Rosas` | [`supabase/email-templates/magic-link.html`](supabase/email-templates/magic-link.html) |
+| **Change Email Address** | `Confirme seu novo e-mail • Mimo Rosas` | [`supabase/email-templates/change-email.html`](supabase/email-templates/change-email.html) |
+
+**Como aplicar no Supabase:**
+1. Acesse o painel do projeto → **Authentication** → **Emails** → aba **Templates**
+2. Abra cada modelo da tabela acima, troque o campo **Subject heading** pelo assunto indicado
+3. No campo **Message body** (aba **Source** / código HTML), apague o conteúdo padrão, copie todo o conteúdo do arquivo `.html` correspondente e clique em **Save**
+
+> 💡 **Sobre a logo no e-mail:** O Gmail e o Outlook bloqueiam `<svg>` dentro de e-mails. Por isso os templates usam a imagem PNG [`public/email-logo.png`](public/email-logo.png) servida publicamente (`https://raw.githubusercontent.com/davischaffer1/mimo-rosas/main/public/email-logo.png` ou `https://seudominio.com.br/email-logo.png`). Se quiser trocar a logo no futuro, basta substituir o arquivo `public/email-logo.png` e fazer push para o GitHub.
 
 ### 2.5 URLs de redirecionamento
 
