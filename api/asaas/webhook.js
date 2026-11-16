@@ -47,12 +47,21 @@ export default async function handler(req, res) {
 
   if (PAID_EVENTS.includes(event) || PAID_STATUSES.includes(payment?.status)) {
     const saved = await updateOrderStatus(orderId, 'Pago');
-    console.log('[asaas/webhook]', event, orderId, saved ? 'pago' : 'falha ao atualizar');
+    if (!saved) {
+      // 5xx faz o Asaas reenviar (fila de sincronização) até a gravação funcionar.
+      console.error('[asaas/webhook]', event, orderId, 'falha ao gravar como Pago');
+      return res.status(503).json({ ok: false, error: 'save_failed', orderId });
+    }
+    console.log('[asaas/webhook]', event, orderId, 'pago');
     return res.status(200).json({ ok: true, orderId, status: 'Pago' });
   }
 
   if (REVERSED_EVENTS.includes(event)) {
-    await updateOrderStatus(orderId, 'Pendente');
+    const saved = await updateOrderStatus(orderId, 'Pendente');
+    if (!saved) {
+      console.error('[asaas/webhook]', event, orderId, 'falha ao gravar estorno');
+      return res.status(503).json({ ok: false, error: 'save_failed', orderId });
+    }
     console.log('[asaas/webhook]', event, orderId, 'estorno/chargeback');
     return res.status(200).json({ ok: true, orderId, status: 'Pendente' });
   }
