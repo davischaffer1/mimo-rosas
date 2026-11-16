@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 120 120">
+  <title>Mimo Rosas</title>
+  <rect width="120" height="120" fill="#FFF9F3" />
+  <g transform="translate(20, 12)" fill="none" stroke="#A90F4D" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 18C24 11 32 8 41 8C50 8 59 11 59 18C59 24 49 27 40 27C30 27 24 23 24 18Z" stroke-width="2.2" />
+    <path d="M31 17C34 14 46 14 49 17C51 19 46 22 40 22C34 22 29 19 31 17Z" stroke-width="1.9" />
+    <path d="M36 17.5C38 16.5 42 16.5 44 17.5" stroke-width="1.8" />
+    <path d="M23 16C18 19 16 27 18 36C20 46 28 56 41 56C53 56 61 46 63 35C65 26 62 19 58 16" stroke-width="2.2" />
+    <path d="M21 24C27 31 38 34 52 29" stroke-width="1.9" />
+    <path d="M18 33C26 42 40 44 58 31" stroke-width="1.9" />
+    <path d="M25 46C33 49 48 48 56 41" stroke-width="1.8" />
+    <path d="M40.5 56V89" stroke-width="2.3" />
+    <path d="M40.5 76C32 71 23 67 16 69C22 75 31 78 40.5 77Z" stroke-width="1.9" />
+    <path d="M40.5 78C48 74 56 71 63 73C57 79 49 80 40.5 79Z" stroke-width="1.9" />
+  </g>
+</svg>
