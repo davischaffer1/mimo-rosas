@@ -7,6 +7,29 @@ import {
 const brl = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
 // Prazo máximo para concluir o pagamento de um pedido pendente (30 minutos)
+const getCanceledOrderIds = () => {
+  try {
+    const raw = localStorage.getItem('mimo_canceled_orders');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const markOrderCanceledLocally = (orderId) => {
+  if (!orderId) return;
+  try {
+    const current = new Set(getCanceledOrderIds());
+    current.add(orderId);
+    localStorage.setItem('mimo_canceled_orders', JSON.stringify(Array.from(current)));
+    const activeOrder = localStorage.getItem('mimo_active_order');
+    if (activeOrder) {
+      const parsed = JSON.parse(activeOrder);
+      if (parsed?.code === orderId) localStorage.removeItem('mimo_active_order');
+    }
+  } catch { /* ignora */ }
+};
 const ORDER_EXPIRATION_MINUTES = 30;
 const ORDER_EXPIRATION_MS = ORDER_EXPIRATION_MINUTES * 60 * 1000;
 
@@ -81,14 +104,13 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
       setOrdersLoading(true);
       setOrdersError('');
 
-      // Dispara limpeza no banco de pedidos não pagos com mais de 30 minutos
+      // Dispara limpeza no servidor de pedidos não pagos com mais de 30 minutos
       try {
         fetch('/api/asaas/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'cleanup' })
         }).catch(() => {});
-        client.rpc('cleanup_expired_orders').then(() => {}).catch(() => {});
       } catch { /* ignora */ }
 
       const { data, error } = await client
@@ -103,20 +125,27 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
           : error.message);
         setOrders([]);
       } else {
+        const canceledSet = new Set(getCanceledOrderIds());
         const mine = (data || []).filter((o) => (
-          o.user_id === user.id
-          || (o.email && user.email && String(o.email).toLowerCase() === String(user.email).toLowerCase())
+          !canceledSet.has(o.id)
+          && (
+            o.user_id === user.id
+            || (o.email && user.email && String(o.email).toLowerCase() === String(user.email).toLowerCase())
+          )
         ));
-        // Separa pedidos expirados (> 30 min sem pagamento) e solicita exclusão no servidor
+        // Separa pedidos expirados (> 30 min sem pagamento) e solicita exclusão no servidor/banco
         const expired = mine.filter((o) => isOrderExpired(o));
         if (expired.length > 0) {
-          expired.forEach((exp) => {
-            fetch('/api/asaas/config', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'cancel', orderId: exp.id })
-            }).catch(() => {});
-            client.from('orders').delete().eq('id', exp.id).then(() => {}).catch(() => {});
+          expired.forEach(async (exp) => {
+            markOrderCanceledLocally(exp.id);
+            try {
+              fetch('/api/asaas/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'cancel', orderId: exp.id })
+              }).catch(() => {});
+              await client.from('orders').delete().eq('id', exp.id);
+            } catch { /* ignora */ }
           });
         }
         const validOrders = mine.filter((o) => !isOrderExpired(o));
@@ -141,16 +170,20 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
     if (!orderId || cancelingId) return;
     setCancelingId(orderId);
     try {
-      await fetch('/api/asaas/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel', orderId })
-      }).catch(() => {});
-      if (client) {
-        await client.rpc('cancel_my_pending_order', { p_order_id: orderId }).catch(() => {});
-        await client.from('orders').delete().eq('id', orderId).catch(() => {});
-      }
+      markOrderCanceledLocally(orderId);
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      try {
+        await fetch('/api/asaas/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'cancel', orderId })
+        });
+      } catch { /* ignora */ }
+      if (client) {
+        try {
+          await client.from('orders').delete().eq('id', orderId);
+        } catch { /* ignora */ }
+      }
       onToast?.(`Pedido #${orderId} cancelado e removido.`);
     } finally {
       setCancelingId(null);
