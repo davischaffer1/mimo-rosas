@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://www.mimorosas.com.br/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://www.mimorosas.com.br/og-image.png</image:loc>
+      <image:title>Mimo Rosas • Presentes, Aromas e Sabores em Chapecó/SC</image:title>
+      <image:caption>Cuias resinadas, infusões para chimarrão, cápsulas de chá em formato de rosa, chaveiros personalizados em resina e presentes artesanais.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://www.mimorosas.com.br/favicon-512x512.png</image:loc>
+      <image:title>Logo Mimo Rosas</image:title>
+    </image:image>
+  </url>
+</urlset>

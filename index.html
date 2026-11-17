@@ -4,8 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#A90F4D" />
-    <title>Mimo Rosas • Presentes, Aromas e Sabores</title>
-    <meta name="description" content="Mimo Rosas — Presentes artesanais, cuias resinadas, infusões para chimarrão, cápsulas de chá em formato de rosa e chaveiros personalizados em Chapecó/SC e região." />
+
+    <!-- Título e Descrição que aparecem na Pesquisa do Google -->
+    <title>Mimo Rosas • Presentes, Aromas e Sabores Artesanais em Chapecó/SC</title>
+    <meta
+      name="description"
+      content="Presentes artesanais feitos com amor em Chapecó/SC e região: cuias resinadas, chaveiros personalizados com iniciais em resina, infusões para chimarrão e drinks, cápsulas de chá em formato de rosa e bombas personalizadas."
+    />
+    <meta
+      name="keywords"
+      content="Mimo Rosas, presentes artesanais Chapecó, cuias resinadas, chaveiros em resina personalizados, infusões para chimarrão, cápsulas de chá de rosa, enfeites de cuia, bombas de chimarrão personalizadas"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="thumbnail" content="https://www.mimorosas.com.br/favicon-512x512.png" />
     <link rel="canonical" href="https://www.mimorosas.com.br/" />
 
     <!-- Favicons oficiais compatíveis com a Pesquisa Google (múltiplos de 48px + .ico na raiz) -->
@@ -18,15 +29,33 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
-    <!-- Open Graph / WhatsApp / Instagram -->
+    <!-- Open Graph / Imagem e Texto para Google Search, WhatsApp e Instagram -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="Mimo Rosas" />
-    <meta property="og:title" content="Mimo Rosas • Presentes, Aromas e Sabores" />
-    <meta property="og:description" content="Presentes artesanais, cuias resinadas, infusões, cápsulas de chá e chaveiros personalizados em Chapecó/SC e região." />
+    <meta property="og:title" content="Mimo Rosas • Presentes, Aromas e Sabores Artesanais" />
+    <meta
+      property="og:description"
+      content="Presentes artesanais feitos com amor em Chapecó/SC e região: cuias resinadas, chaveiros personalizados em resina, infusões para chimarrão, cápsulas de chá em formato de rosa e mimos especiais."
+    />
     <meta property="og:url" content="https://www.mimorosas.com.br/" />
-    <meta property="og:image" content="https://www.mimorosas.com.br/favicon-512x512.png" />
+    <meta property="og:image" content="https://www.mimorosas.com.br/og-image.png" />
+    <meta property="og:image:secure_url" content="https://www.mimorosas.com.br/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Mimo Rosas • Presentes, Aromas e Sabores Artesanais em Chapecó/SC" />
 
-    <!-- Dados Estruturados para o Google (Nome do Site + Logo na Pesquisa) -->
+    <!-- Twitter / Card de Imagem Grande -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Mimo Rosas • Presentes, Aromas e Sabores Artesanais" />
+    <meta
+      name="twitter:description"
+      content="Cuias resinadas, chaveiros personalizados em resina, infusões para chimarrão e cápsulas de chá em formato de rosa em Chapecó/SC e região."
+    />
+    <meta name="twitter:image" content="https://www.mimorosas.com.br/og-image.png" />
+
+    <!-- Dados Estruturados para o Google (Nome do Site, Descrição, Imagem e Loja Local) -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,13 +64,26 @@
             "@type": "WebSite",
             "name": "Mimo Rosas",
             "alternateName": "Mimo Rosas Artesanal",
-            "url": "https://www.mimorosas.com.br/"
+            "url": "https://www.mimorosas.com.br/",
+            "description": "Presentes artesanais feitos com amor em Chapecó/SC e região: cuias resinadas, chaveiros personalizados em resina, infusões para chimarrão e cápsulas de chá em formato de rosa."
           },
           {
-            "@type": "Organization",
-            "name": "Mimo Rosas",
+            "@type": "Store",
+            "name": "Mimo Rosas • Presentes, Aromas e Sabores",
             "url": "https://www.mimorosas.com.br/",
-            "logo": "https://www.mimorosas.com.br/favicon-512x512.png"
+            "logo": "https://www.mimorosas.com.br/favicon-512x512.png",
+            "image": [
+              "https://www.mimorosas.com.br/og-image.png",
+              "https://www.mimorosas.com.br/favicon-512x512.png"
+            ],
+            "description": "Loja artesanal de presentes, aromas e sabores em Chapecó/SC. Cuias resinadas, chaveiros personalizados com iniciais em resina, infusões para chimarrão e drinks, cápsulas de chá em formato de rosa e bombas personalizadas.",
+            "priceRange": "$$",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Chapecó",
+              "addressRegion": "SC",
+              "addressCountry": "BR"
+            }
           }
         ]
       }
@@ -50,7 +92,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="bg-[#FFF9F3] m-0 p-0">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Conteúdo semântico estático para leitura imediata do Googlebot antes da hidratação do React -->
+      <main style="max-width: 960px; margin: 0 auto; padding: 32px 16px; font-family: Georgia, serif; color: #4A2532;">
+        <h1>Mimo Rosas • Presentes, Aromas e Sabores Artesanais em Chapecó/SC</h1>
+        <p>
+          Presentes artesanais feitos com amor em Chapecó/SC e região próxima: cuias resinadas personalizadas,
+          chaveiros em resina com letra inicial e pétalas reais, infusões aromáticas para chimarrão, tererê e drinks,
+          blends de ervas, cápsulas de chá em formato de rosa, cápsulas de café gourmet, enfeites de cuia e bombas personalizadas.
+        </p>
+        <img
+          src="/og-image.png"
+          alt="Mimo Rosas • Presentes, Aromas e Sabores Artesanais"
+          width="600"
+          height="315"
+          style="max-width: 100%; height: auto; border-radius: 20px;"
+        />
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
