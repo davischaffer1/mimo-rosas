@@ -643,6 +643,15 @@ export default function App() {
     cep: '', address: '', number: '', complement: '', neighborhood: '', city: '',
     notes: '', deliveryMethod: 'delivery', paymentMethod: 'pix'
   });
+  const [cardData, setCardData] = useState({
+    number: '',
+    holderName: '',
+    expiry: '',
+    cvv: '',
+    cpfCnpj: '',
+    installments: 1
+  });
+  const [cardError, setCardError] = useState('');
   // Pagamento online via Asaas: o site pergunta ao servidor se as chaves já estão configuradas.
   const [asaasConfig, setAsaasConfig] = useState({ enabled: false, env: null });
   const [orderSuccess, setOrderSuccess] = useState(() => {
@@ -955,6 +964,25 @@ export default function App() {
 
   const verifyOrderPaymentOnMercadoPago = async (orderId, paymentIdParam = null, customToken = null) => {
     const token = (customToken || storeConfig.mercadoPagoAccessToken || '').trim();
+    try {
+      const srvRes = await fetch('/api/asaas/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mp_check',
+          orderId,
+          paymentId: paymentIdParam,
+          accessToken: token || undefined
+        })
+      });
+      if (srvRes.ok) {
+        const srvData = await srvRes.json();
+        if (srvData?.ok && srvData?.status) {
+          return { status: srvData.status, paymentId: srvData.paymentId || paymentIdParam };
+        }
+      }
+    } catch { /* fallback navegador */ }
+
     if (!token.startsWith('APP_USR-') && !token.startsWith('TEST-')) return null;
     try {
       if (paymentIdParam && paymentIdParam !== 'null') {
@@ -1700,17 +1728,87 @@ export default function App() {
   };
 
   // ============================================================================
-  // CHECKOUT INTELIGENTE: PIX DIRETO NA TELA + CARTÃO VIA CHECKOUT PRO
+  // CHECKOUT TRANSPARENTE: PIX DINÂMICO + CARTÃO DIRETO NA TELA (SEM REDIRECIONAR)
   // ============================================================================
+  const detectCardBrandFrontend = (numStr = '') => {
+    const d = String(numStr).replace(/\D/g, '');
+    if (/^4/.test(d)) return { id: 'visa', label: 'VISA', color: 'bg-[#1A1F71] text-white' };
+    if (/^(5[1-5]|2[2-7])/.test(d)) return { id: 'master', label: 'MASTERCARD', color: 'bg-[#EB001B] text-white' };
+    if (/^3[47]/.test(d)) return { id: 'amex', label: 'AMEX', color: 'bg-[#006FCF] text-white' };
+    if (/^(606282|3841)/.test(d)) return { id: 'hipercard', label: 'HIPERCARD', color: 'bg-[#822124] text-white' };
+    if (/^(4011|4312|4389|4514|4576|5041|5066|5067|509|6277|6362|6363|650|6516|6550)/.test(d)) return { id: 'elo', label: 'ELO', color: 'bg-[#00A4E0] text-white' };
+    return null;
+  };
+
+  const formatCardNumberInput = (val = '') => {
+    const digits = String(val).replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatCardExpiryInput = (val = '') => {
+    const digits = String(val).replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  const formatCpfCnpjInput = (val = '') => {
+    const d = String(val).replace(/\D/g, '').slice(0, 14);
+    if (d.length <= 11) {
+      return d
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    return d
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  };
+
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (!checkoutData.name.trim() || !checkoutData.phone.trim() || isSubmittingCheckout) return;
+    setCardError('');
 
-    // O Asaas exige CPF/CNPJ do pagador para emitir a cobrança.
+    const isCardMethod = ['card', 'mercadopago'].includes(checkoutData.paymentMethod);
+    const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
+    const activeMpPublicKey = (storeConfig.mercadoPagoPublicKey || '').trim();
+    const hasMpToken = activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-');
+
+    // Validação de CPF quando Asaas está ativo
     if (asaasConfig.enabled) {
       const docDigits = String(checkoutData.document || '').replace(/\D/g, '');
       if (docDigits.length !== 11 && docDigits.length !== 14) {
         showAdminToast('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) para o pagamento online.');
+        return;
+      }
+    }
+
+    // Validação do formulário de Cartão Transparente antes de fechar a sacola
+    if (!asaasConfig.enabled && isCardMethod) {
+      const numDigits = String(cardData.number || '').replace(/\D/g, '');
+      const expDigits = String(cardData.expiry || '').replace(/\D/g, '');
+      const cvvDigits = String(cardData.cvv || '').replace(/\D/g, '');
+      const docDigits = String(cardData.cpfCnpj || checkoutData.document || '').replace(/\D/g, '');
+      if (numDigits.length < 13) {
+        setCardError('Digite os 16 dígitos do número do cartão.');
+        return;
+      }
+      if (!String(cardData.holderName || '').trim()) {
+        setCardError('Digite o nome impresso no cartão.');
+        return;
+      }
+      if (expDigits.length < 4 || Number(expDigits.slice(0, 2)) < 1 || Number(expDigits.slice(0, 2)) > 12) {
+        setCardError('Informe a validade do cartão no formato MM/AA.');
+        return;
+      }
+      if (cvvDigits.length < 3) {
+        setCardError('Informe o código de segurança (CVV) de 3 ou 4 dígitos.');
+        return;
+      }
+      if (docDigits.length !== 11 && docDigits.length !== 14) {
+        setCardError('Informe um CPF válido (11 dígitos) do titular do cartão.');
         return;
       }
     }
@@ -1731,16 +1829,15 @@ export default function App() {
         customerName: checkoutData.name.trim(),
         phone: checkoutData.phone.trim(),
         email: (checkoutData.email || auth.user?.email || '').trim(),
+        document: (checkoutData.document || cardData.cpfCnpj || '').replace(/\D/g, ''),
         userId: auth.user?.id || null,
         deliveryMethod: checkoutData.deliveryMethod,
         address: fullAddress,
         city: checkoutData.city || '',
         cep: checkoutData.cep || '-',
         notes: checkoutData.notes || '',
-        paymentMethod: checkoutData.paymentMethod,
-        // "Aguardando Pagamento" só no cartão do Asaas. No fluxo antigo (Mercado Pago)
-        // o status continua "Aguardando PIX", que é o que a sincronização do painel filtra.
-        status: (asaasConfig.enabled && checkoutData.paymentMethod !== 'pix') ? 'Aguardando Pagamento' : 'Aguardando PIX',
+        paymentMethod: isCardMethod ? 'card' : 'pix',
+        status: isCardMethod ? 'Aguardando Pagamento' : 'Aguardando PIX',
         total: Number(cartTotal.toFixed(2)),
         shipping: Number(shippingFee.toFixed(2)),
         date: nowFormatted,
@@ -1750,6 +1847,125 @@ export default function App() {
         items: cart.map((item) => ({ id: item.id, name: `${item.name} (${item.variation})`, qty: item.quantity, price: item.price }))
       };
 
+      let pixCode = generatePixCopyPaste(storeConfig.pixKey || storeConfig.whatsappNumber, storeConfig.pixHolderName || 'MIMO ROSAS', 'BRASIL', cartTotal, code.replace(/[^A-Z0-9]/g, ''));
+      let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+      let mpPaymentId = null;
+      let mpCheckoutProUrl = null;
+      let mpPreferenceId = null;
+      let asaasPaymentId = null;
+      let asaasInvoiceUrl = null;
+      let paymentAlreadyConfirmed = false;
+
+      // =========================================================================
+      // 1. CHECKOUT TRANSPARENTE DE CARTÃO (MERCADO PAGO DIRETO NA TELA)
+      // =========================================================================
+      if (!asaasConfig.enabled && isCardMethod) {
+        const cardRes = await fetch('/api/asaas/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'mp_card',
+            order: newOrder,
+            card: {
+              number: cardData.number,
+              holderName: cardData.holderName || checkoutData.name,
+              expiry: cardData.expiry,
+              cvv: cardData.cvv,
+              cpfCnpj: cardData.cpfCnpj || checkoutData.document,
+              installments: cardData.installments
+            },
+            accessToken: activeMpToken || undefined,
+            publicKey: activeMpPublicKey || undefined
+          })
+        });
+        const cardResult = await cardRes.json().catch(() => ({}));
+
+        if (!cardRes.ok || !cardResult?.ok) {
+          setCardError(
+            cardResult?.message ||
+            'Não foi possível aprovar o cartão agora. Confira os dados digitados ou escolha o PIX Instantâneo.'
+          );
+          return;
+        }
+
+        mpPaymentId = cardResult.paymentId || null;
+        newOrder.mpPaymentId = mpPaymentId;
+        if (cardResult.paid || cardResult.status === 'approved') {
+          paymentAlreadyConfirmed = true;
+          newOrder.status = 'Pago';
+        }
+      }
+
+      // =========================================================================
+      // 2. CHECKOUT TRANSPARENTE DE PIX (QR CODE DINÂMICO OFICIAL MERCADO PAGO)
+      // =========================================================================
+      if (!asaasConfig.enabled && !isCardMethod && hasMpToken) {
+        try {
+          const mpPixRes = await fetch('/api/asaas/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'mp_pix',
+              order: newOrder,
+              cpfCnpj: checkoutData.document,
+              accessToken: activeMpToken
+            })
+          });
+          const mpPixData = await mpPixRes.json().catch(() => null);
+          if (mpPixRes.ok && mpPixData?.ok && mpPixData?.pix?.payload) {
+            mpPaymentId = mpPixData.paymentId || null;
+            newOrder.mpPaymentId = mpPaymentId;
+            pixCode = mpPixData.pix.payload;
+            qrCodeUrl = mpPixData.pix.encodedImage
+              ? `data:image/png;base64,${mpPixData.pix.encodedImage}`
+              : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+            if (mpPixData.alreadyPaid) {
+              paymentAlreadyConfirmed = true;
+              newOrder.status = 'Pago';
+            }
+          }
+        } catch { /* fallback PIX chave da loja */ }
+      }
+
+      // =========================================================================
+      // 3. FLUXO ASAAS (SE CONFIGURADO NAS VARIÁVEIS DO SERVIDOR)
+      // =========================================================================
+      if (asaasConfig.enabled) {
+        try {
+          const payRes = await fetch('/api/asaas/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: code,
+              billingType: checkoutData.paymentMethod === 'pix' ? 'PIX' : 'CARD',
+              cpfCnpj: checkoutData.document
+            })
+          });
+          const payData = await payRes.json().catch(() => null);
+
+          if (payRes.ok && payData?.ok) {
+            asaasPaymentId = payData.paymentId || null;
+            if (payData.alreadyPaid) {
+              paymentAlreadyConfirmed = true;
+              newOrder.status = 'Pago';
+            }
+            if (payData.billingType === 'PIX' && payData.pix?.payload) {
+              pixCode = payData.pix.payload;
+              qrCodeUrl = payData.pix.encodedImage
+                ? `data:image/png;base64,${payData.pix.encodedImage}`
+                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
+            } else if (payData.billingType === 'UNDEFINED') {
+              asaasInvoiceUrl = payData.invoiceUrl || null;
+            }
+          } else if (payData?.message) {
+            showAdminToast(payData.message);
+          }
+        } catch {
+          showAdminToast('Pagamento online indisponível agora. Use o PIX abaixo ou fale com a loja no WhatsApp.');
+        }
+      }
+
+      // Salva o pedido no estado local, reduz estoque, grava no Supabase e envia o e-mail correspondente
       const updatedOrdersList = [newOrder, ...orders];
       setOrders(updatedOrdersList);
       try {
@@ -1766,133 +1982,20 @@ export default function App() {
       await saveOrderToSupabase(newOrder);
       notifyCustomerOrderStatusEmail(newOrder, newOrder.status);
 
-      let pixCode = generatePixCopyPaste(storeConfig.pixKey || storeConfig.whatsappNumber, storeConfig.pixHolderName || 'MIMO ROSAS', 'BRASIL', cartTotal, code.replace(/[^A-Z0-9]/g, ''));
-      let qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
-      let mpPaymentId = null;
-      let mpCheckoutProUrl = null;
-      let mpPreferenceId = null;
-      let asaasPaymentId = null;
-      let asaasInvoiceUrl = null;
-      let asaasConfirmed = false;
-
-      const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
-      const hasMpToken = activeMpToken.startsWith('APP_USR-') || activeMpToken.startsWith('TEST-');
-
-      // ==========================================
-      // FLUXO PRINCIPAL: ASAAS (PIX e cartão com confirmação automática)
-      // ==========================================
-      if (asaasConfig.enabled) {
-        try {
-          const payRes = await fetch('/api/asaas/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orderId: code,
-              billingType: checkoutData.paymentMethod === 'pix' ? 'PIX' : 'CARD',
-              cpfCnpj: checkoutData.document
-            })
-          });
-          const payData = await payRes.json().catch(() => null);
-
-          if (payRes.ok && payData?.ok) {
-            asaasPaymentId = payData.paymentId || null;
-            asaasConfirmed = Boolean(payData.alreadyPaid);
-            if (payData.billingType === 'PIX' && payData.pix?.payload) {
-              // QR Code oficial do Asaas: confirma sozinho quando a cliente paga.
-              pixCode = payData.pix.payload;
-              qrCodeUrl = payData.pix.encodedImage
-                ? `data:image/png;base64,${payData.pix.encodedImage}`
-                : `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pixCode)}`;
-            } else if (payData.billingType === 'UNDEFINED') {
-              asaasInvoiceUrl = payData.invoiceUrl || null;
-            }
-          } else if (payData?.message) {
-            showAdminToast(payData.message);
-          }
-        } catch {
-          showAdminToast('Pagamento online indisponível agora. Use o PIX abaixo ou fale com a loja no WhatsApp.');
-        }
-      }
-
-      // ==========================================
-      // FLUXO ALTERNATIVO: CARTÃO VIA MERCADO PAGO
-      // (usado apenas enquanto o Asaas não estiver configurado)
-      // ==========================================
-      if (!asaasConfig.enabled && checkoutData.paymentMethod !== 'pix' && hasMpToken) {
-        try {
-          const currentOrigin = window.location.origin || 'https://mimorosas.com.br';
-          const mpItems = cart.map((item) => ({
-            id: String(item.id),
-            title: `${item.name} (${item.variation})`,
-            quantity: Number(item.quantity),
-            currency_id: 'BRL',
-            unit_price: Number(Number(item.price).toFixed(2))
-          }));
-
-          if (shippingFee > 0) {
-            mpItems.push({
-              id: 'frete',
-              title: 'Frete / Entrega Mimo Rosas',
-              quantity: 1,
-              currency_id: 'BRL',
-              unit_price: Number(Number(shippingFee).toFixed(2))
-            });
-          }
-
-          const prefRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${activeMpToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              items: mpItems,
-              payer: {
-                name: checkoutData.name.trim(),
-                email: checkoutData.email?.trim() || `cliente.${code.toLowerCase()}@mimorosas.com.br`,
-                phone: { number: checkoutData.phone.replace(/\D/g, '') }
-              },
-              external_reference: code,
-              back_urls: {
-                success: `${currentOrigin}/?mp_return=success&order_id=${code}`,
-                pending: `${currentOrigin}/?mp_return=pending&order_id=${code}`,
-                failure: `${currentOrigin}/?mp_return=failure&order_id=${code}`
-              },
-              auto_return: 'approved',
-              statement_descriptor: 'MIMOROSAS'
-            })
-          });
-
-          if (prefRes.ok) {
-            const prefData = await prefRes.json();
-            if (prefData.init_point) {
-              mpCheckoutProUrl = prefData.init_point;
-              mpPreferenceId = prefData.id || null;
-              newOrder.mpPreferenceId = mpPreferenceId;
-              await saveOrderToSupabase(newOrder);
-            }
-          }
-        } catch (err) { console.error("Erro MP Pref:", err); }
-      }
-
-      // PIX: quando o Asaas está ligado, o código acima já é o QR Code oficial e
-      // o pagamento se confirma sozinho (webhook + consulta automática).
-      // Sem Asaas, mantém o PIX estático da loja como reserva.
-
       const itemsSummaryText = newOrder.items.map((i) => `• ${i.qty}x ${i.name} (${formatBRL(i.price * i.qty)})`).join('\n');
       const waMessage =
         `Olá Mimo Rosas! 🌹 Acabei de fazer o pedido *${code}* no site:\n\n` +
         `*Cliente:* ${checkoutData.name}\n` +
         `*Telefone:* ${checkoutData.phone}\n` +
         `*Recebimento:* ${newOrder.address} (CEP: ${newOrder.cep})\n` +
-        `*Pagamento:* ${checkoutData.paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}\n\n` +
+        `*Pagamento:* ${isCardMethod ? `Cartão de Crédito (${cardData.installments}x)` : 'PIX'}${paymentAlreadyConfirmed ? ' — PAGO ✅' : ''}\n\n` +
         `*Itens do Pedido:*\n${itemsSummaryText}\n\n` +
         `*Total:* ${formatBRL(cartTotal)}`;
 
       const successObj = {
         code, customer: checkoutData.name, total: cartTotal,
-        method: checkoutData.paymentMethod, delivery: checkoutData.deliveryMethod,
-        paymentConfirmed: asaasConfirmed,
+        method: isCardMethod ? 'card' : 'pix', delivery: checkoutData.deliveryMethod,
+        paymentConfirmed: paymentAlreadyConfirmed,
         mpPaymentId, mpPreferenceId, mpCheckoutProUrl, pixCode, qrCodeUrl,
         asaasPaymentId, asaasInvoiceUrl,
         whatsappUrl: `https://wa.me/${(storeConfig.whatsappNumber || '5554999999999').replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`
@@ -1902,11 +2005,8 @@ export default function App() {
       try { localStorage.setItem('mimo_active_order', JSON.stringify(successObj)); } catch { /* ignore */ }
       setCart([]);
 
-      if (mpCheckoutProUrl) {
-        window.location.href = mpCheckoutProUrl;
-      } else if (asaasInvoiceUrl) {
-        // A fatura do Asaas abre em outra aba para a cliente não perder o pedido de vista.
-        try { window.open(asaasInvoiceUrl, '_blank', 'noopener'); } catch { /* bloqueado: o botão na tela resolve */ }
+      if (asaasInvoiceUrl) {
+        try { window.open(asaasInvoiceUrl, '_blank', 'noopener'); } catch { /* bloqueado */ }
       }
     } finally {
       setIsSubmittingCheckout(false);
@@ -3334,6 +3434,59 @@ export default function App() {
                             onChange={(e) => setStoreConfig({ ...storeConfig, pixHolderName: e.target.value })}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#F0F8FF]/70 border border-[#BBDDF8] space-y-3 text-xs">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <p className="font-bold text-[#005B8F] flex items-center gap-1.5">
+                              <CreditCard className="w-4 h-4 text-[#009EE3]" />
+                              <span>Checkout Transparente Mercado Pago (PIX Oficial + Cartão na Loja)</span>
+                            </p>
+                            <p className="text-[11px] text-[#35637C]">
+                              A cliente paga com PIX dinâmico ou digita o Cartão de Crédito <strong>direto dentro do site da Mimo Rosas</strong> (sem redirecionar para fora) e o status muda para <strong>Pago</strong> sozinho.
+                            </p>
+                          </div>
+                          {(storeConfig.mercadoPagoAccessToken || '').trim().startsWith('APP_USR-') && (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10.5px] font-bold">
+                              ✓ Transparente Ativo
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-1">
+                            <label className="block font-semibold text-[#4A2532] mb-1">Access Token (APP_USR-...)</label>
+                            <input
+                              type="password"
+                              placeholder="APP_USR-..."
+                              value={storeConfig.mercadoPagoAccessToken || ''}
+                              onChange={(e) => setStoreConfig({ ...storeConfig, mercadoPagoAccessToken: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#BBDDF8] font-mono text-[11px] text-[#4A2532] focus:outline-none focus:border-[#009EE3]"
+                            />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <label className="block font-semibold text-[#4A2532] mb-1">Public Key (APP_USR-...)</label>
+                            <input
+                              type="text"
+                              placeholder="APP_USR-..."
+                              value={storeConfig.mercadoPagoPublicKey || ''}
+                              onChange={(e) => setStoreConfig({ ...storeConfig, mercadoPagoPublicKey: e.target.value })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#BBDDF8] font-mono text-[11px] text-[#4A2532] focus:outline-none focus:border-[#009EE3]"
+                            />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <label className="block font-semibold text-[#4A2532] mb-1">Máx. Parcelas no Cartão</label>
+                            <select
+                              value={storeConfig.maxInstallments || 3}
+                              onChange={(e) => setStoreConfig({ ...storeConfig, maxInstallments: Number(e.target.value) })}
+                              className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#BBDDF8] text-xs font-semibold text-[#4A2532] focus:outline-none focus:border-[#009EE3]"
+                            >
+                              {[1, 2, 3, 4, 5, 6, 10, 12].map((n) => (
+                                <option key={n} value={n}>Até {n}x no cartão</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
 
@@ -5401,11 +5554,11 @@ export default function App() {
                                 <button type="button" onClick={() => safeCopyText(orderSuccess.pixCode, 'Código PIX Copia e Cola')} className="px-3 py-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs"><Copy className="w-3 h-3" /> Copiar Código PIX</button>
                               </div>
                               <input type="text" readOnly value={orderSuccess.pixCode} onClick={(e) => e.target.select()} className="w-full px-3 py-2 rounded-xl bg-[#FFF9F3] border border-[#E5CFC9] font-mono text-[10px] text-[#4A2532]" />
-                              {!orderSuccess.asaasPaymentId && (
+                              {!orderSuccess.asaasPaymentId && !orderSuccess.mpPaymentId && (
                                 <p className="text-[11px] text-[#795344] text-center pt-0.5">Recebedor: <strong>{storeConfig.pixHolderName || 'Mimo Rosas'}</strong> • Chave: <strong>{storeConfig.pixKey || storeConfig.whatsappNumber}</strong></p>
                               )}
-                              {orderSuccess.asaasPaymentId && (
-                                <p className="text-[11px] text-emerald-800 text-center pt-0.5 font-semibold">PIX oficial Mimo Rosas • confirmação automática</p>
+                              {(orderSuccess.asaasPaymentId || orderSuccess.mpPaymentId) && (
+                                <p className="text-[11px] text-emerald-800 text-center pt-0.5 font-semibold">PIX oficial Mimo Rosas • confirmação automática na tela</p>
                               )}
                             </div>
                             <div className="pt-2 border-t border-[#E5CFC9]">
@@ -5471,20 +5624,21 @@ export default function App() {
                         <input type="text" required value={checkoutData.name} onChange={(e) => setCheckoutData({ ...checkoutData, name: e.target.value })} placeholder="Seu nome completo *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
                         <input type="tel" required value={checkoutData.phone} onChange={(e) => setCheckoutData({ ...checkoutData, phone: e.target.value })} placeholder="WhatsApp (DDD) 99999-9999 *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
                         <input type="email" required value={checkoutData.email} onChange={(e) => setCheckoutData({ ...checkoutData, email: e.target.value })} placeholder="E-mail para comprovantes e rastreio *" className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm sm:col-span-2" />
-                        {asaasConfig.enabled && (
-                          <div className="sm:col-span-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              required
-                              value={checkoutData.document}
-                              onChange={(e) => setCheckoutData({ ...checkoutData, document: e.target.value })}
-                              placeholder="CPF ou CNPJ do pagador *"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
-                            />
-                            <p className="text-[10px] text-[#795344] pt-1">Exigido pelo banco para emitir o PIX/cartão. Não aparece para ninguém.</p>
-                          </div>
-                        )}
+                        <div className="sm:col-span-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            required={asaasConfig.enabled || ['card', 'mercadopago'].includes(checkoutData.paymentMethod)}
+                            value={checkoutData.document}
+                            onChange={(e) => {
+                              const formatted = formatCpfCnpjInput(e.target.value);
+                              setCheckoutData({ ...checkoutData, document: formatted });
+                              if (!cardData.cpfCnpj) setCardData((prev) => ({ ...prev, cpfCnpj: formatted }));
+                            }}
+                            placeholder="CPF do comprador (para emissão do PIX / Cartão) *"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                          />
+                        </div>
                       </div>
                       {!auth.user && (
                         <p className="text-[11px] text-[#795344]">
@@ -5515,13 +5669,13 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3 lg:col-span-2">
-                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento e Resumo ({formatBRL(cartTotal)})</h2>
+                    <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-4 lg:col-span-2">
+                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento Transparente na Loja ({formatBRL(cartTotal)})</h2>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* BOTÃO PIX DIRETO */}
+                        {/* BOTÃO PIX TRANSPARENTE */}
                         <button
                           type="button"
-                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: 'pix' })}
+                          onClick={() => { setCardError(''); setCheckoutData({ ...checkoutData, paymentMethod: 'pix' }); }}
                           className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
                             checkoutData.paymentMethod === 'pix'
                               ? 'border-[#A90F4D] bg-[#FCEEF2] shadow-sm'
@@ -5533,43 +5687,169 @@ export default function App() {
                           </div>
                           <div className="text-left">
                             <span className="text-xs font-bold block text-[#4A2532]">PIX Instantâneo</span>
-                            <span className="text-[10px] text-emerald-700 font-semibold">Aprovação na hora (Recomendado)</span>
+                            <span className="text-[10px] text-emerald-700 font-semibold">QR Code na tela • Aprovação automática</span>
                           </div>
                         </button>
 
-                        {/* BOTÃO CARTÃO (ASAAS OU CHECKOUT PRO MERCADO PAGO) */}
+                        {/* BOTÃO CARTÃO TRANSPARENTE */}
                         <button
                           type="button"
-                          onClick={() => setCheckoutData({ ...checkoutData, paymentMethod: asaasConfig.enabled ? 'card' : 'mercadopago' })}
+                          onClick={() => { setCardError(''); setCheckoutData({ ...checkoutData, paymentMethod: 'card' }); }}
                           className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
                             ['card', 'mercadopago'].includes(checkoutData.paymentMethod)
-                              ? (asaasConfig.enabled ? 'border-[#0E9F6E] bg-[#F0FAF4] shadow-sm' : 'border-[#009EE3] bg-[#F0F9FF] shadow-sm')
-                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#0E9F6E]/50'
+                              ? 'border-[#A90F4D] bg-[#FCEEF2] shadow-sm'
+                              : 'border-[#E5CFC9] bg-[#F6E9E5] hover:border-[#A90F4D]/50'
                           }`}
                         >
                           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-xs">
-                            <CreditCard className={`w-5 h-5 ${asaasConfig.enabled ? 'text-[#0E9F6E]' : 'text-[#009EE3]'}`} />
+                            <CreditCard className="w-5 h-5 text-[#A90F4D]" />
                           </div>
                           <div className="text-left">
-                            <span className={`text-xs font-bold block ${asaasConfig.enabled ? 'text-[#046C4E]' : 'text-[#005B8F]'}`}>Cartão de Crédito</span>
-                            <span className="text-[10px] text-[#795344]">{asaasConfig.enabled ? 'Pix, cartão ou boleto • Asaas' : 'Checkout Seguro Mercado Pago'}</span>
+                            <span className="text-xs font-bold block text-[#4A2532]">Cartão de Crédito</span>
+                            <span className="text-[10px] text-[#795344]">Pague aqui mesmo sem sair do site</span>
                           </div>
                         </button>
                       </div>
 
-                      <button type="submit" disabled={isSubmittingCheckout} className={`w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 ${['card', 'mercadopago'].includes(checkoutData.paymentMethod) ? (asaasConfig.enabled ? 'bg-[#0E9F6E] hover:bg-[#0B875D]' : 'bg-[#009EE3] hover:bg-[#0082BD]') : 'bg-[#A90F4D] hover:bg-[#8E0B3F]'}`}>
-                        {isSubmittingCheckout
-                          ? 'Salvando pedido e conectando...'
-                          : ['card', 'mercadopago'].includes(checkoutData.paymentMethod)
-                            ? `Pagar com Cartão • ${formatBRL(cartTotal)}`
-                            : `Gerar QR Code PIX • ${formatBRL(cartTotal)}`}
+                      {/* FORMULÁRIO DE CARTÃO DE CRÉDITO TRANSPARENTE (DENTRO DO SITE) */}
+                      {['card', 'mercadopago'].includes(checkoutData.paymentMethod) && !asaasConfig.enabled && (() => {
+                        const detectedBrand = detectCardBrandFrontend(cardData.number);
+                        const maxInst = Math.max(1, Number(storeConfig.maxInstallments || 3));
+                        return (
+                          <div className="p-4 sm:p-5 rounded-2xl bg-[#F6E9E5]/80 border border-[#DFC3BC] space-y-3.5">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-[#A90F4D]" />
+                                <span className="text-xs font-bold text-[#4A2532]">Dados do Cartão de Crédito (Ambiente Criptografado)</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {detectedBrand ? (
+                                  <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wider ${detectedBrand.color}`}>
+                                    {detectedBrand.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10.5px] text-[#795344] font-medium">Visa • Master • Elo • Hipercard • Amex</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {cardError && (
+                              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>{cardError}</span>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div className="sm:col-span-2">
+                                <label className="block font-semibold text-[#4A2532] mb-1">Número do Cartão *</label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    required
+                                    placeholder="0000 0000 0000 0000"
+                                    value={cardData.number}
+                                    onChange={(e) => setCardData({ ...cardData, number: formatCardNumberInput(e.target.value) })}
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] font-mono text-sm text-[#4A2532] tracking-wider focus:outline-none focus:border-[#A90F4D]"
+                                  />
+                                  <CreditCard className="w-4 h-4 text-[#9A7468] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                </div>
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <label className="block font-semibold text-[#4A2532] mb-1">Nome impresso no Cartão *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Ex: MARIA C SILVA"
+                                  value={cardData.holderName}
+                                  onChange={(e) => setCardData({ ...cardData, holderName: e.target.value.toUpperCase() })}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] text-sm uppercase text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-[#4A2532] mb-1">Validade (MM/AA) *</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  required
+                                  placeholder="MM/AA"
+                                  value={cardData.expiry}
+                                  onChange={(e) => setCardData({ ...cardData, expiry: formatCardExpiryInput(e.target.value) })}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] font-mono text-sm text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-[#4A2532] mb-1">Código de Segurança (CVV) *</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  required
+                                  maxLength={4}
+                                  placeholder="123"
+                                  value={cardData.cvv}
+                                  onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] font-mono text-sm text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-[#4A2532] mb-1">CPF do Titular do Cartão *</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  required
+                                  placeholder="000.000.000-00"
+                                  value={cardData.cpfCnpj || checkoutData.document}
+                                  onChange={(e) => setCardData({ ...cardData, cpfCnpj: formatCpfCnpjInput(e.target.value) })}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] text-sm text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-[#4A2532] mb-1">Parcelamento *</label>
+                                <select
+                                  value={cardData.installments}
+                                  onChange={(e) => setCardData({ ...cardData, installments: Number(e.target.value) })}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] text-sm font-semibold text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                                >
+                                  {Array.from({ length: maxInst }, (_, i) => i + 1).map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}x de {formatBRL(cartTotal / n)} {n <= 3 ? 'sem juros' : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <button type="submit" disabled={isSubmittingCheckout} className="w-full py-3.5 rounded-full bg-[#A90F4D] hover:bg-[#8E0B3F] text-white font-semibold text-sm shadow-lg transition disabled:opacity-60 flex items-center justify-center gap-2">
+                        {isSubmittingCheckout ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Processando pagamento seguro...</span>
+                          </>
+                        ) : ['card', 'mercadopago'].includes(checkoutData.paymentMethod) ? (
+                          <>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>Finalizar e Pagar com Cartão ({cardData.installments}x de {formatBRL(cartTotal / (cardData.installments || 1))})</span>
+                          </>
+                        ) : (
+                          <>
+                            <QrCode className="w-4 h-4" />
+                            <span>Gerar QR Code PIX • {formatBRL(cartTotal)}</span>
+                          </>
+                        )}
                       </button>
-                      {asaasConfig.enabled && (
-                        <p className="text-[10px] text-center text-[#795344] flex items-center justify-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                          Pagamento processado pelo Asaas • confirmação automática
-                        </p>
-                      )}
+                      <p className="text-[10.5px] text-center text-[#795344] flex items-center justify-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Checkout Transparente Mimo Rosas • Processado com criptografia pelo Mercado Pago</span>
+                      </p>
                     </div>
                   </form>
                 )}

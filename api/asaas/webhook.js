@@ -2,23 +2,44 @@ import {
   readJsonBody,
   readRawBody,
   updateOrderStatus,
+  mpCheckOrderPayment,
   PAID_STATUSES
 } from '../../server/asaas.js';
 
 // POST /api/asaas/webhook
-// O Asaas chama esta URL sozinho quando o pagamento muda de status.
-// É o que faz o pedido virar "Pago" mesmo com a cliente fora do site.
+// Recebe notificações automáticas tanto do Mercado Pago (Checkout Transparente) quanto do Asaas.
+// Marca o pedido como "Pago" e dispara o e-mail de confirmação automaticamente.
 const PAID_EVENTS = ['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED', 'PAYMENT_RECEIVED_IN_CASH'];
 const REVERSED_EVENTS = ['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'];
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Método não permitido.' });
   }
 
-  // Token combinado no painel do Asaas (aba Webhooks > Token de autenticação).
+  let payload = readJsonBody(req);
+  if (!payload || typeof payload !== 'object' || (!payload.event && !payload.type && !payload.action)) {
+    const raw = readRawBody(req);
+    try { payload = JSON.parse(raw); } catch { payload = {}; }
+  }
+
+  // 1. Notificação do Mercado Pago (type: "payment" ou topic: "payment")
+  const mpPaymentId =
+    payload?.data?.id ||
+    req.query?.['data.id'] ||
+    (req.query?.topic === 'payment' ? req.query?.id : null);
+
+  if (mpPaymentId || payload?.type === 'payment' || String(payload?.action || '').startsWith('payment.')) {
+    if (mpPaymentId) {
+      const check = await mpCheckOrderPayment({ paymentId: String(mpPaymentId) });
+      return res.status(200).json({ ok: true, provider: 'mercadopago', ...check });
+    }
+    return res.status(200).json({ ok: true, provider: 'mercadopago', ignored: 'no_payment_id' });
+  }
+
+  // 2. Notificação do Asaas
   const expected = (process.env.ASAAS_WEBHOOK_TOKEN || '').trim();
   if (expected) {
     const received = String(req.headers['asaas-access-token'] || '').trim();
@@ -28,11 +49,6 @@ export default async function handler(req, res) {
     }
   }
 
-  let payload = readJsonBody(req);
-  if (!payload || typeof payload !== 'object' || !payload.event) {
-    const raw = readRawBody(req);
-    try { payload = JSON.parse(raw); } catch { payload = null; }
-  }
   if (!payload || typeof payload !== 'object') {
     return res.status(200).json({ ok: true, ignored: 'invalid_body' });
   }

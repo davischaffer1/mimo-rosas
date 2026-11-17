@@ -122,10 +122,16 @@ export async function findPaymentsByReference(orderId) {
 }
 
 // ---------------------------------------------------------------------------
-// Supabase (service role: ignora RLS, por isso NUNCA pode ir para o navegador)
+// Supabase (usa service_role se configurado, ou chave publicável da loja)
 // ---------------------------------------------------------------------------
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_7WyhLNtUeEMNnbE_MyTo2g_IYrCA8AU';
+
 function supabaseFetch(path, init = {}) {
-  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const key = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    DEFAULT_SUPABASE_KEY
+  ).trim();
   if (!key) throw httpError('Pagamento online ainda não configurado.', 503);
 
   const base = (process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
@@ -547,6 +553,393 @@ export async function deletePendingOrder(orderId) {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Mercado Pago • Checkout Transparente (PIX Oficial + Cartão na Loja)
+// ---------------------------------------------------------------------------
+export async function getMercadoPagoCredentials(options = {}) {
+  let accessToken = String(
+    options.accessToken ||
+    process.env.MP_ACCESS_TOKEN ||
+    process.env.MERCADOPAGO_ACCESS_TOKEN ||
+    ''
+  ).trim();
+  let publicKey = String(
+    options.publicKey ||
+    process.env.MP_PUBLIC_KEY ||
+    process.env.MERCADOPAGO_PUBLIC_KEY ||
+    ''
+  ).trim();
+
+  if (!accessToken || !publicKey) {
+    const cfg = await fetchStoreConfigFromSupabasePublic();
+    if (!accessToken && cfg.mercadoPagoAccessToken) {
+      accessToken = String(cfg.mercadoPagoAccessToken).trim();
+    }
+    if (!publicKey && cfg.mercadoPagoPublicKey) {
+      publicKey = String(cfg.mercadoPagoPublicKey).trim();
+    }
+  }
+  return { accessToken, publicKey };
+}
+
+function splitFullName(raw = '') {
+  const parts = String(raw || 'Cliente Mimo Rosas').trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || 'Cliente';
+  const lastName = parts.length > 1 ? parts.slice(1).join(' ') : 'Mimo Rosas';
+  return { firstName, lastName };
+}
+
+function detectCardBrandByBin(cardNumber = '') {
+  const num = onlyDigits(cardNumber);
+  if (/^4/.test(num)) return 'visa';
+  if (/^(5[1-5]|2[2-7])/.test(num)) return 'master';
+  if (/^3[47]/.test(num)) return 'amex';
+  if (/^(606282|3841)/.test(num)) return 'hipercard';
+  if (/^(4011|4312|4389|4514|4576|5041|5066|5067|509|6277|6362|6363|650|6516|6550)/.test(num)) return 'elo';
+  return 'visa';
+}
+
+export function translateMpRejection(statusDetail = '') {
+  const map = {
+    cc_rejected_bad_filled_card_number: 'Número do cartão inválido. Verifique os dígitos digitados.',
+    cc_rejected_bad_filled_date: 'Data de validade do cartão inválida ou vencida.',
+    cc_rejected_bad_filled_other: 'Algum dado do cartão foi preenchido incorretamente. Revise e tente novamente.',
+    cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) inválido. Confira os 3 dígitos atrás do cartão.',
+    cc_rejected_blacklist: 'Não foi possível processar este cartão. Tente outro cartão ou pague via PIX.',
+    cc_rejected_call_for_authorize: 'O banco emissor pede autorização para esta compra. Autorize no app do banco ou use o PIX.',
+    cc_rejected_card_disabled: 'Este cartão está desativado ou bloqueado no app do seu banco.',
+    cc_rejected_duplicated_payment: 'Você já realizou um pagamento idêntico há poucos instantes.',
+    cc_rejected_high_risk: 'Por segurança do Mercado Pago, o cartão não foi autorizado. Recomendamos pagar via PIX instantâneo.',
+    cc_rejected_insufficient_amount: 'Saldo ou limite insuficiente no cartão.',
+    cc_rejected_invalid_installments: 'O cartão selecionado não aceita essa quantidade de parcelas.',
+    cc_rejected_max_attempts: 'Você atingiu o limite de tentativas com este cartão. Tente outro cartão ou use o PIX.'
+  };
+  return map[statusDetail] || 'O banco emissor não autorizou a cobrança neste cartão. Verifique os dados ou escolha o PIX.';
+}
+
+async function updateOrderMpPaymentId(orderId, mpPaymentId, status = undefined) {
+  if (!isValidOrderId(orderId) || !mpPaymentId) return;
+  try {
+    const patch = { mp_payment_id: String(mpPaymentId) };
+    if (status) patch.status = status;
+    await supabaseFetch(`/orders?id=eq.${encodeURIComponent(String(orderId))}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
+    });
+  } catch { /* ignore */ }
+}
+
+// Cria cobrança PIX Transparente direto na API v1/payments do Mercado Pago
+export async function mpCreateTransparentPix({ orderOrId, cpfCnpj, accessToken: tokenOpt }) {
+  const { accessToken } = await getMercadoPagoCredentials({ accessToken: tokenOpt });
+  if (!accessToken || (!accessToken.startsWith('APP_USR-') && !accessToken.startsWith('TEST-'))) {
+    return { ok: false, reason: 'mp_not_configured', message: 'Access Token do Mercado Pago ainda não configurado.' };
+  }
+
+  let order = typeof orderOrId === 'object' && orderOrId ? orderOrId : null;
+  const orderId = String(order?.id || order?.code || orderOrId || '').trim();
+  if ((!order || !order.total) && orderId) {
+    try { order = await getOrder(orderId); } catch { /* ignore */ }
+  }
+  if (!order) {
+    return { ok: false, reason: 'order_not_found', message: 'Pedido não encontrado.' };
+  }
+
+  const amount = Number(Number(order.total || 0).toFixed(2));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, reason: 'invalid_amount', message: 'Valor do pedido inválido.' };
+  }
+
+  const { firstName, lastName } = splitFullName(order.customer || order.customer_name || 'Cliente Mimo Rosas');
+  const email = String(order.email || '').trim() || `cliente.${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}@mimorosas.com.br`;
+  const docClean = onlyDigits(cpfCnpj || order.document || '');
+
+  const payload = {
+    transaction_amount: amount,
+    description: `Pedido #${orderId} - Mimo Rosas`,
+    payment_method_id: 'pix',
+    external_reference: orderId,
+    payer: {
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      ...(docClean.length === 11 || docClean.length === 14
+        ? {
+            identification: {
+              type: docClean.length === 14 ? 'CNPJ' : 'CPF',
+              number: docClean
+            }
+          }
+        : {})
+    }
+  };
+
+  const res = await fetch('https://api.mercadopago.com/v1/payments', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': `mimo-pix-${orderId}-${Date.now()}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const causeMsg = data?.cause?.[0]?.description || data?.message || 'Não foi possível gerar o QR Code PIX no Mercado Pago.';
+    return { ok: false, status: res.status, message: causeMsg, detail: data };
+  }
+
+  const txData = data?.point_of_interaction?.transaction_data || {};
+  const paymentId = data?.id ? String(data.id) : null;
+  if (paymentId) {
+    await updateOrderMpPaymentId(orderId, paymentId);
+  }
+
+  return {
+    ok: true,
+    provider: 'mercadopago',
+    paymentId,
+    status: data?.status || 'pending',
+    alreadyPaid: data?.status === 'approved',
+    pix: {
+      payload: txData.qr_code || '',
+      encodedImage: txData.qr_code_base64 || null,
+      ticketUrl: txData.ticket_url || null
+    }
+  };
+}
+
+// Cria e processa cobrança de Cartão de Crédito Transparente (sem sair do site)
+export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToken: tokenOpt, publicKey: pubOpt }) {
+  const { accessToken, publicKey } = await getMercadoPagoCredentials({
+    accessToken: tokenOpt,
+    publicKey: pubOpt
+  });
+  if (!accessToken || (!accessToken.startsWith('APP_USR-') && !accessToken.startsWith('TEST-'))) {
+    return { ok: false, reason: 'mp_not_configured', message: 'Configure o Access Token do Mercado Pago no painel /admin para cobrar cartões.' };
+  }
+
+  let order = typeof orderOrId === 'object' && orderOrId ? orderOrId : null;
+  const orderId = String(order?.id || order?.code || orderOrId || '').trim();
+  if ((!order || !order.total) && orderId) {
+    try { order = await getOrder(orderId); } catch { /* ignore */ }
+  }
+  if (!order) {
+    return { ok: false, reason: 'order_not_found', message: 'Pedido não encontrado.' };
+  }
+
+  const amount = Number(Number(order.total || 0).toFixed(2));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, reason: 'invalid_amount', message: 'Valor do pedido inválido.' };
+  }
+
+  const cardNumber = onlyDigits(card.number);
+  const holderName = String(card.holderName || order.customer || 'CLIENTE MIMO ROSAS').trim();
+  const expRaw = String(card.expiry || '').replace(/\D/g, '');
+  const expMonth = Number(card.expMonth || expRaw.slice(0, 2));
+  const rawYear = String(card.expYear || expRaw.slice(2));
+  const expYear = Number(rawYear.length === 2 ? `20${rawYear}` : rawYear);
+  const cvv = onlyDigits(card.cvv);
+  const docClean = onlyDigits(card.cpfCnpj || order.document || '');
+  const installments = Math.max(1, Math.min(12, Number(card.installments || 1)));
+
+  let cardTokenId = String(card.token || '').trim();
+  let paymentMethodId = String(card.paymentMethodId || '').trim();
+  let issuerId = card.issuerId || undefined;
+
+  // 1. Descobre a bandeira e o banco emissor pelo BIN (6 primeiros dígitos)
+  const bin = cardNumber.slice(0, 6);
+  if (!paymentMethodId && bin.length === 6) {
+    try {
+      const binRes = await fetch(
+        `https://api.mercadopago.com/v1/payment_methods/search?bins=${bin}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (binRes.ok) {
+        const binData = await binRes.json();
+        const pm = Array.isArray(binData?.results) ? binData.results[0] : null;
+        if (pm?.id) paymentMethodId = pm.id;
+        if (pm?.issuer?.id && !issuerId) issuerId = pm.issuer.id;
+      }
+    } catch { /* fallback local */ }
+  }
+  if (!paymentMethodId) {
+    paymentMethodId = detectCardBrandByBin(cardNumber);
+  }
+
+  // 2. Se o token ainda não veio do navegador, gera o card_token na API oficial do Mercado Pago
+  if (!cardTokenId) {
+    if (cardNumber.length < 13 || !expMonth || expMonth > 12 || !expYear || cvv.length < 3) {
+      return { ok: false, message: 'Verifique o número do cartão, a validade (MM/AA) e o código CVV.' };
+    }
+    if (docClean.length !== 11 && docClean.length !== 14) {
+      return { ok: false, message: 'Informe um CPF válido do titular do cartão.' };
+    }
+
+    const tokenUrl = publicKey
+      ? `https://api.mercadopago.com/v1/card_tokens?public_key=${encodeURIComponent(publicKey)}`
+      : 'https://api.mercadopago.com/v1/card_tokens';
+
+    const tokenRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': `mimo-tok-${orderId}-${Date.now()}`
+      },
+      body: JSON.stringify({
+        card_number: cardNumber,
+        expiration_month: expMonth,
+        expiration_year: expYear,
+        security_code: cvv,
+        cardholder: {
+          name: holderName,
+          identification: {
+            type: docClean.length === 14 ? 'CNPJ' : 'CPF',
+            number: docClean
+          }
+        }
+      })
+    });
+
+    const tokenData = await tokenRes.json().catch(() => ({}));
+    if (!tokenRes.ok || !tokenData?.id) {
+      const cause = tokenData?.cause?.[0]?.description || tokenData?.message || 'Dados do cartão inválidos. Revise o número, validade e CVV.';
+      return { ok: false, message: cause, detail: tokenData };
+    }
+    cardTokenId = tokenData.id;
+  }
+
+  // 3. Executa a cobrança transparente no Mercado Pago (/v1/payments)
+  const { firstName, lastName } = splitFullName(order.customer || holderName);
+  const email = String(order.email || '').trim() || `cliente.${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}@mimorosas.com.br`;
+
+  const paymentPayload = {
+    transaction_amount: amount,
+    token: cardTokenId,
+    description: `Pedido #${orderId} - Mimo Rosas`,
+    installments,
+    payment_method_id: paymentMethodId,
+    ...(issuerId ? { issuer_id: issuerId } : {}),
+    external_reference: orderId,
+    statement_descriptor: 'MIMOROSAS',
+    payer: {
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      ...(docClean.length === 11 || docClean.length === 14
+        ? {
+            identification: {
+              type: docClean.length === 14 ? 'CNPJ' : 'CPF',
+              number: docClean
+            }
+          }
+        : {})
+    }
+  };
+
+  const payRes = await fetch('https://api.mercadopago.com/v1/payments', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': `mimo-card-${orderId}-${Date.now()}`
+    },
+    body: JSON.stringify(paymentPayload)
+  });
+
+  const payData = await payRes.json().catch(() => ({}));
+  if (!payRes.ok) {
+    const errMsg = payData?.cause?.[0]?.description || payData?.message || 'Não foi possível processar o cartão agora.';
+    return { ok: false, message: errMsg, detail: payData };
+  }
+
+  const paymentId = payData?.id ? String(payData.id) : null;
+  const status = String(payData?.status || '');
+  const statusDetail = String(payData?.status_detail || '');
+
+  if (status === 'approved') {
+    await updateOrderMpPaymentId(orderId, paymentId, 'Pago');
+    await updateOrderStatus(orderId, 'Pago');
+    return {
+      ok: true,
+      paid: true,
+      status: 'approved',
+      paymentId
+    };
+  }
+
+  if (status === 'in_process' || status === 'pending') {
+    if (paymentId) await updateOrderMpPaymentId(orderId, paymentId);
+    return {
+      ok: true,
+      paid: false,
+      status,
+      paymentId,
+      message: 'Seu pagamento com cartão está em análise rápida pela operadora e será confirmado em instantes.'
+    };
+  }
+
+  return {
+    ok: false,
+    paid: false,
+    status: 'rejected',
+    statusDetail,
+    paymentId,
+    message: translateMpRejection(statusDetail)
+  };
+}
+
+// Consulta pagamento no Mercado Pago pelo servidor (sem bloqueio de CORS)
+export async function mpCheckOrderPayment({ orderId, paymentId, accessToken: tokenOpt }) {
+  const { accessToken } = await getMercadoPagoCredentials({ accessToken: tokenOpt });
+  if (!accessToken || (!accessToken.startsWith('APP_USR-') && !accessToken.startsWith('TEST-'))) {
+    return { ok: false, paid: false };
+  }
+
+  try {
+    if (paymentId && paymentId !== 'null') {
+      const directRes = await fetch(
+        `https://api.mercadopago.com/v1/payments/${encodeURIComponent(String(paymentId))}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (directRes.ok) {
+        const d = await directRes.json();
+        if (d?.status === 'approved') {
+          const refOrder = orderId || d.external_reference;
+          if (refOrder) await updateOrderStatus(refOrder, 'Pago');
+          return { ok: true, paid: true, status: 'approved', paymentId: String(d.id) };
+        }
+        return { ok: true, paid: false, status: d?.status || 'pending', paymentId: String(d?.id || paymentId) };
+      }
+    }
+
+    if (orderId) {
+      const searchRes = await fetch(
+        `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(String(orderId))}&sort=date_created&criteria=desc`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (searchRes.ok) {
+        const d = await searchRes.json();
+        const results = Array.isArray(d?.results) ? d.results : [];
+        const approved = results.find((p) => p?.status === 'approved');
+        if (approved) {
+          await updateOrderStatus(orderId, 'Pago');
+          return { ok: true, paid: true, status: 'approved', paymentId: String(approved.id) };
+        }
+        if (results.length > 0) {
+          return { ok: true, paid: false, status: results[0].status, paymentId: String(results[0].id) };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[mp/check]', err?.message);
+  }
+  return { ok: false, paid: false };
 }
 
 // ---------------------------------------------------------------------------
