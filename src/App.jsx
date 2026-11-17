@@ -565,14 +565,20 @@ export default function App() {
   });
   const [storeConfig, setStoreConfig] = useState(() => {
     const defaults = {
-      whatsappNumber: '5554999999999',
-      pixKey: '5554999999999',
+      whatsappNumber: '5549999999999',
+      pixKey: '5549999999999',
       pixHolderName: 'Mimo Rosas Artesanal',
       mercadoPagoAccessToken: '',
+      mercadoPagoPublicKey: '',
+      maxInstallments: 3,
       autoApproveDemoSeconds: 0,
       freeShippingMin: 120,
-      defaultShippingFee: 14.9,
-      assistantGreeting: 'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais.',
+      defaultShippingFee: 12,
+      shippingBaseFee: 6,
+      shippingPerKm: 1.5,
+      shippingMaxKm: 50,
+      storeLocationText: 'Ateliê Mimo Rosas - Chapecó/SC',
+      assistantGreeting: 'Olá! 🌹 Seja muito bem-vinda à Mimo Rosas! Sou sua assistente virtual e estou aqui para ajudar você a encontrar produtos especiais em Chapecó e região.',
       adminPassword: 'mimo2026'
     };
     try { const s = localStorage.getItem('mimo_db_config'); return s ? { ...defaults, ...JSON.parse(s) } : defaults; } catch { return defaults; }
@@ -1438,16 +1444,129 @@ export default function App() {
   useEffect(() => { if (isAssistantOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, isAssistantOpen, isBotTyping]);
 
   // ============================================================================
-  // CARRINHO
+  // CARRINHO E CÁLCULO DE FRETE POR KM (CHAPECÓ/SC E REGIÃO PRÓXIMA)
   // ============================================================================
+  const CHAPECO_REGION_ZONES = [
+    { id: 'chapeco-centro', label: 'Chapecó • Centro', city: 'Chapecó/SC', km: 2, keywords: ['centro'] },
+    { id: 'chapeco-goretti', label: 'Chapecó • Maria Goretti / Jardim Itália / Bela Vista', city: 'Chapecó/SC', km: 3, keywords: ['goretti', 'jardim italia', 'jardim itália', 'bela vista', 'presidente medici', 'presidente médici'] },
+    { id: 'chapeco-passo', label: 'Chapecó • Passo dos Fortes / Líder / Santa Maria', city: 'Chapecó/SC', km: 4, keywords: ['passo dos fortes', 'lider', 'líder', 'santa maria', 'sao cristovao', 'são cristóvão', 'santo antonio', 'santo antônio', 'saic'] },
+    { id: 'chapeco-univ', label: 'Chapecó • Universitário / Esplanada / Jardins', city: 'Chapecó/SC', km: 4.5, keywords: ['universitario', 'universitário', 'esplanada', 'jardins', 'boa vista'] },
+    { id: 'chapeco-palmeiras', label: 'Chapecó • Parque das Palmeiras / Palmital / Cristo Rei', city: 'Chapecó/SC', km: 5.5, keywords: ['palmeiras', 'palmital', 'cristo rei', 'eldorado'] },
+    { id: 'chapeco-pinheirinho', label: 'Chapecó • Pinheirinho / Alvorada / Engenho Braun', city: 'Chapecó/SC', km: 6, keywords: ['pinheirinho', 'alvorada', 'engenho braun', 'sao pedro', 'são pedro', 'bom pastor', 'vila real', 'paraiso', 'paraíso'] },
+    { id: 'chapeco-seminario', label: 'Chapecó • Seminário / Quedas do Palmital / Belvedere', city: 'Chapecó/SC', km: 7.5, keywords: ['seminario', 'seminário', 'quedas', 'belvedere', 'trevo'] },
+    { id: 'chapeco-efapi', label: 'Chapecó • Efapi / Loteamento Universitário / Colatto', city: 'Chapecó/SC', km: 8.5, keywords: ['efapi', 'colatto', 'desbravador', 'alta floresta'] },
+    { id: 'chapeco-bormann', label: 'Chapecó • Marechal Bormann / Goio-Ên / Interior', city: 'Chapecó/SC', km: 14, keywords: ['bormann', 'goio-en', 'goio-ên', 'linha', 'interior'] },
+    { id: 'cordilheira-alta', label: 'Região • Cordilheira Alta / SC (~14 km)', city: 'Cordilheira Alta/SC', km: 14, keywords: ['cordilheira alta'] },
+    { id: 'guatambu', label: 'Região • Guatambu / SC (~18 km)', city: 'Guatambu/SC', km: 18, keywords: ['guatambu'] },
+    { id: 'coronel-freitas', label: 'Região • Coronel Freitas / SC (~23 km)', city: 'Coronel Freitas/SC', km: 23, keywords: ['coronel freitas'] },
+    { id: 'xaxim', label: 'Região • Xaxim / SC (~24 km)', city: 'Xaxim/SC', km: 24, keywords: ['xaxim'] },
+    { id: 'nova-itaberaba', label: 'Região • Nova Itaberaba / SC (~29 km)', city: 'Nova Itaberaba/SC', km: 29, keywords: ['nova itaberaba'] },
+    { id: 'planalto-alegre', label: 'Região • Planalto Alegre / SC (~30 km)', city: 'Planalto Alegre/SC', km: 30, keywords: ['planalto alegre'] },
+    { id: 'caxambu-do-sul', label: 'Região • Caxambu do Sul / SC (~36 km)', city: 'Caxambu do Sul/SC', km: 36, keywords: ['caxambu do sul'] },
+    { id: 'aguas-de-chapeco', label: 'Região • Águas de Chapecó / SC (~40 km)', city: 'Águas de Chapecó/SC', km: 40, keywords: ['aguas de chapeco', 'águas de chapecó'] },
+    { id: 'nonoai', label: 'Região • Nonoai / RS (~42 km)', city: 'Nonoai/RS', km: 42, keywords: ['nonoai'] },
+    { id: 'xanxere', label: 'Região • Xanxerê / SC (~43 km)', city: 'Xanxerê/SC', km: 43, keywords: ['xanxere', 'xanxerê'] },
+    { id: 'sao-carlos', label: 'Região • São Carlos / SC (~44 km)', city: 'São Carlos/SC', km: 44, keywords: ['sao carlos', 'são carlos'] },
+    { id: 'pinhalzinho', label: 'Região • Pinhalzinho / SC (~45 km)', city: 'Pinhalzinho/SC', km: 45, keywords: ['pinhalzinho'] }
+  ];
+
+  const normalizeStr = (s = '') =>
+    String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const matchZoneByCityAndNeighborhood = (cityStr = '', neighborhoodStr = '', cepStr = '') => {
+    const cNorm = normalizeStr(cityStr);
+    const nNorm = normalizeStr(neighborhoodStr);
+    const cepDigits = String(cepStr || '').replace(/\D/g, '');
+
+    // Verifica primeiro se é uma das cidades vizinhas de Chapecó
+    for (const z of CHAPECO_REGION_ZONES) {
+      if (!z.id.startsWith('chapeco-') && z.keywords.some((k) => cNorm.includes(normalizeStr(k)))) {
+        return { zone: z, outOfArea: false };
+      }
+    }
+
+    // Se a cidade é Chapecó (ou CEP 89800-000 a 89816-999)
+    const isChapeco =
+      cNorm.includes('chapeco') ||
+      (cepDigits.length >= 5 && Number(cepDigits.slice(0, 5)) >= 89800 && Number(cepDigits.slice(0, 5)) <= 89816);
+
+    if (isChapeco) {
+      for (const z of CHAPECO_REGION_ZONES) {
+        if (z.id.startsWith('chapeco-') && z.keywords.some((k) => nNorm.includes(normalizeStr(k)))) {
+          return { zone: z, outOfArea: false };
+        }
+      }
+      // Se é Chapecó mas o bairro não está listado especificamente, usa distância média de 4 km
+      return { zone: CHAPECO_REGION_ZONES[2], outOfArea: false };
+    }
+
+    // Se o CEP começa com 898 (Oeste de SC próximo a Chapecó) ou 99600 (Nonoai)
+    if (cepDigits.startsWith('898') || cepDigits.startsWith('99600')) {
+      return { zone: { id: 'regiao-proxima', label: `${cityStr || 'Região de Chapecó'} (~25 km)`, city: cityStr || 'Região de Chapecó/SC', km: 25 }, outOfArea: false };
+    }
+
+    // Se digitou outra cidade fora da região de Chapecó
+    if (cNorm && !isChapeco) {
+      return { zone: null, outOfArea: true };
+    }
+
+    return { zone: CHAPECO_REGION_ZONES[2], outOfArea: false };
+  };
+
+  const handleCepLookup = async (rawCep) => {
+    const digits = String(rawCep || '').replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setCheckoutData((prev) => ({ ...prev, cep: formatted }));
+
+    if (digits.length !== 8) return;
+    setCheckoutData((prev) => ({ ...prev, cepLoading: true, outOfArea: false }));
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (data && !data.erro) {
+        const cityUf = `${data.localidade}/${data.uf}`;
+        const bairro = data.bairro || '';
+        const rua = data.logradouro || '';
+        const matched = matchZoneByCityAndNeighborhood(cityUf, bairro, digits);
+        setCheckoutData((prev) => ({
+          ...prev,
+          cepLoading: false,
+          city: cityUf,
+          neighborhood: bairro || prev.neighborhood,
+          address: rua || prev.address,
+          distanceKm: matched.zone ? matched.zone.km : prev.distanceKm || 4,
+          regionZoneId: matched.zone ? matched.zone.id : 'out-of-area',
+          outOfArea: matched.outOfArea
+        }));
+      } else {
+        setCheckoutData((prev) => ({ ...prev, cepLoading: false }));
+      }
+    } catch {
+      setCheckoutData((prev) => ({ ...prev, cepLoading: false }));
+    }
+  };
+
   const cartCount = useMemo(() => cart.reduce((a, i) => a + i.quantity, 0), [cart]);
   const cartSubtotal = useMemo(() => cart.reduce((a, i) => a + i.price * i.quantity, 0), [cart]);
+  const activeDistanceKm = useMemo(() => {
+    const d = Number(checkoutData.distanceKm);
+    return Number.isFinite(d) && d > 0 ? d : 4;
+  }, [checkoutData.distanceKm]);
+
   const shippingFee = useMemo(() => {
     if (cart.length === 0) return 0;
     if (checkoutData.deliveryMethod === 'pickup') return 0;
-    if (cartSubtotal >= Number(storeConfig.freeShippingMin || 120)) return 0;
-    return Number(storeConfig.defaultShippingFee || 14.9);
-  }, [cart.length, checkoutData.deliveryMethod, cartSubtotal, storeConfig]);
+    const freeMin = Number(storeConfig.freeShippingMin ?? 120);
+    // Frete grátis acima do mínimo para entregas dentro de Chapecó (até 12 km)
+    if (freeMin > 0 && cartSubtotal >= freeMin && activeDistanceKm <= 12) return 0;
+    const baseFee = Number(storeConfig.shippingBaseFee ?? 6);
+    const perKm = Number(storeConfig.shippingPerKm ?? 1.5);
+    const calculated = baseFee + activeDistanceKm * perKm;
+    return Number(Math.max(baseFee, calculated).toFixed(2));
+  }, [cart.length, checkoutData.deliveryMethod, cartSubtotal, storeConfig, activeDistanceKm]);
   const cartTotal = cartSubtotal + shippingFee;
 
   const visibleProducts = useMemo(() => products.filter((p) => p.active !== false), [products]);
@@ -1651,7 +1770,7 @@ export default function App() {
         botReply =
           `Nossos produtos vão de ${formatBRL(minPrice)} a ${formatBRL(maxPrice)}:\n\n` +
           `${topLines}\n\n` +
-          `🚚 FRETE GRÁTIS em compras acima de ${formatBRL(storeConfig.freeShippingMin || 120)}!`;
+          `🚚 Entrega em Chapecó e região (FRETE GRÁTIS em Chapecó acima de ${formatBRL(storeConfig.freeShippingMin || 120)})!`;
         suggestedProducts = visibleProducts.slice(0, 2);
       } else if (optionType === 'presentes') {
         botReply = 'Que delícia presentear com a Mimo Rosas! 🎁 Nossas peças artesanais e personalizáveis encantam em qualquer ocasião. Separei sugestões especiais para você:';
@@ -1662,10 +1781,10 @@ export default function App() {
         const extraNote = storeConfig.assistantExtraNote ? `\n✨ *Recado da loja:* ${storeConfig.assistantExtraNote}\n` : '';
         botReply =
           'Claro, estou aqui para ajudar 💕 Dúvidas frequentes:\n\n' +
-          '🚚 *Frete:* ' + formatBRL(storeConfig.defaultShippingFee || 14.9) + ' (grátis acima de ' + formatBRL(storeConfig.freeShippingMin || 120) + ')\n' +
+          '🚚 *Entrega (Chapecó/SC e Região):* Calculada por KM (' + formatBRL(storeConfig.shippingBaseFee ?? 6) + ' + ' + formatBRL(storeConfig.shippingPerKm ?? 1.5) + '/km) — Grátis em Chapecó acima de ' + formatBRL(storeConfig.freeShippingMin || 120) + '\n' +
           '⏱️ *Prazo de produção:* ' + prodTime + '\n' +
-          '💳 *Pagamento:* PIX com aprovação rápida e Cartão de Crédito\n' +
-          '📍 *Retirada:* ' + (storeConfig.storeLocationText || 'Retirada disponível no Ateliê Mimo Rosas') +
+          '💳 *Pagamento:* PIX com aprovação imediata e Cartão de Crédito na loja\n' +
+          '📍 *Retirada:* Grátis no ' + (storeConfig.storeLocationText || 'Ateliê Mimo Rosas - Chapecó/SC') +
           extraNote + '\n' +
           'Se tiver outra dúvida é só me perguntar!';
       } else if (optionType === 'pedidos') {
@@ -1674,7 +1793,7 @@ export default function App() {
           '• Para *acompanhar um pedido*, me informe o código (ex: MR-12345).\n' +
           '• Para *alterar endereço*, chame a equipe no WhatsApp.\n' +
           '• Para *status de pagamento*, verifique se o PIX já foi compensado.\n\n' +
-          'Nossa equipe também está no WhatsApp: ' + (storeConfig.whatsappNumber || '5554999999999') + ' 💕';
+          'Nossa equipe também está no WhatsApp: ' + (storeConfig.whatsappNumber || '5549999999999') + ' 💕';
       } else {
         botReply = 'Como posso te ajudar hoje? Escolha uma das opções abaixo ou digite sua dúvida que te respondo com todo carinho! 🌹';
       }
@@ -1698,14 +1817,14 @@ export default function App() {
       let botReply = '';
       let suggestedProducts = [];
 
-      if (lower.includes('frete') || lower.includes('entrega') || lower.includes('envio')) {
-        botReply = 'Nosso frete padrão é ' + formatBRL(storeConfig.defaultShippingFee || 14.9) + ' e fica *GRÁTIS* em compras acima de ' + formatBRL(storeConfig.freeShippingMin || 120) + '! 🚚';
+      if (lower.includes('frete') || lower.includes('entrega') || lower.includes('envio') || lower.includes('chapec')) {
+        botReply = 'Realizamos entregas exclusivamente para *Chapecó/SC e região próxima*! 🚚 O frete é calculado por KM (' + formatBRL(storeConfig.shippingBaseFee ?? 6) + ' + ' + formatBRL(storeConfig.shippingPerKm ?? 1.5) + '/km) e fica *GRÁTIS* em Chapecó nas compras acima de ' + formatBRL(storeConfig.freeShippingMin || 120) + '. Você também pode retirar grátis no nosso ateliê em Chapecó!';
       } else if (lower.includes('prazo') || lower.includes('demora')) {
-        botReply = 'O prazo de produção é de 2 a 5 dias úteis. Após a postagem, o envio leva de 3 a 10 dias úteis dependendo da região. 📦';
+        botReply = 'O prazo de produção artesanal é de ' + (storeConfig.productionTimeText || '2 a 5 dias úteis') + '. Assim que fica pronto, entregamos rapidinho em Chapecó e região ou avisamos para retirada no ateliê! 📦';
       } else if (lower.includes('pix')) {
         botReply = 'Aceitamos PIX! O QR Code é gerado automaticamente no checkout e a confirmação é automática. 💚';
       } else if (['cartão', 'cartao', 'parcel', 'crédito', 'credito'].some((k) => lower.includes(k))) {
-        botReply = 'Aceitamos Cartão de Crédito em até 3x sem juros pelo checkout seguro! 💳';
+        botReply = 'Aceitamos Cartão de Crédito direto na tela do site (sem redirecionar) em até ' + (storeConfig.maxInstallments || 3) + 'x! 💳';
       } else if (['preço', 'preco', 'valor', 'quanto'].some((k) => lower.includes(k))) {
         botReply = 'Nossos produtos vão de R$ 14,90 (enfeites) até R$ 129,90 (cuias personalizadas). O que você procura? 🌹';
       } else if (['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'].some((k) => lower.includes(k))) {
@@ -1770,6 +1889,11 @@ export default function App() {
     e.preventDefault();
     if (!checkoutData.name.trim() || !checkoutData.phone.trim() || isSubmittingCheckout) return;
     setCardError('');
+
+    if (checkoutData.deliveryMethod === 'delivery' && checkoutData.outOfArea) {
+      showAdminToast('Realizamos entregas apenas em Chapecó/SC e região próxima. Selecione Retirada no Ateliê ou uma cidade da região.');
+      return;
+    }
 
     const isCardMethod = ['card', 'mercadopago'].includes(checkoutData.paymentMethod);
     const activeMpToken = (storeConfig.mercadoPagoAccessToken || '').trim();
@@ -3355,8 +3479,8 @@ export default function App() {
                           <label className="block font-semibold text-[#4A2532] mb-1">Local de Retirada / Cidade</label>
                           <input
                             type="text"
-                            placeholder="Ex: Ateliê Mimo Rosas - Gramado/RS"
-                            value={storeConfig.storeLocationText || 'Ateliê Mimo Rosas'}
+                            placeholder="Ex: Ateliê Mimo Rosas - Chapecó/SC"
+                            value={storeConfig.storeLocationText || 'Ateliê Mimo Rosas - Chapecó/SC'}
                             onChange={(e) => setStoreConfig({ ...storeConfig, storeLocationText: e.target.value })}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
@@ -3377,41 +3501,73 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Card 2: WhatsApp, Frete & Pagamentos */}
+                    {/* Card 2: WhatsApp, Frete por KM (Chapecó e Região) & Pagamentos */}
                     <div className="bg-[#FFF9F3] rounded-3xl p-5 sm:p-6 border border-[#EAD6D0] shadow-2xs space-y-4">
-                      <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
-                        WhatsApp de Atendimento, Frete e Recebimento
-                      </h3>
+                      <div>
+                        <h3 className="font-serif-display text-lg font-bold text-[#4A2532]">
+                          WhatsApp, Frete por KM (Chapecó e Região) e Recebimento
+                        </h3>
+                        <p className="text-xs text-[#795344]">
+                          Entregas configuradas exclusivamente para <strong>Chapecó/SC e cidades próximas</strong>, com cálculo automático por quilometragem.
+                        </p>
+                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                         <div>
-                          <label className="block font-semibold text-[#4A2532] mb-1">WhatsApp da Loja (55 + DDD)</label>
+                          <label className="block font-semibold text-[#4A2532] mb-1">WhatsApp (55 + DDD)</label>
                           <input
                             type="text"
                             value={storeConfig.whatsappNumber}
                             onChange={(e) => setStoreConfig({ ...storeConfig, whatsappNumber: e.target.value })}
-                            placeholder="Ex: 5554999999999"
+                            placeholder="Ex: 5549999999999"
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-[#4A2532] mb-1">Valor do Frete Padrão (R$)</label>
+                          <label className="block font-semibold text-[#4A2532] mb-1">Taxa Base de Saída (R$)</label>
+                          <input
+                            type="number"
+                            step="0.50"
+                            value={storeConfig.shippingBaseFee ?? 6}
+                            onChange={(e) => setStoreConfig({ ...storeConfig, shippingBaseFee: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-[#4A2532] mb-1">Valor por KM (R$/km)</label>
                           <input
                             type="number"
                             step="0.10"
-                            value={storeConfig.defaultShippingFee}
-                            onChange={(e) => setStoreConfig({ ...storeConfig, defaultShippingFee: Number(e.target.value) })}
+                            value={storeConfig.shippingPerKm ?? 1.5}
+                            onChange={(e) => setStoreConfig({ ...storeConfig, shippingPerKm: Number(e.target.value) })}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-[#4A2532] mb-1">Frete Grátis acima de (R$)</label>
+                          <label className="block font-semibold text-[#4A2532] mb-1">Frete Grátis Chapecó (R$)</label>
                           <input
                             type="number"
                             value={storeConfig.freeShippingMin}
                             onChange={(e) => setStoreConfig({ ...storeConfig, freeShippingMin: Number(e.target.value) })}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-[#4A2532] focus:outline-none focus:border-[#A90F4D] focus:bg-white"
                           />
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-[#FCEEF2]/70 border border-[#E5B8C7] text-[11px] text-[#4A2532] flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          🚚 <strong>Simulação da regra atual:</strong> Taxa base {formatBRL(storeConfig.shippingBaseFee ?? 6)} + {formatBRL(storeConfig.shippingPerKm ?? 1.5)}/km
+                        </span>
+                        <div className="flex flex-wrap gap-2 text-[10.5px]">
+                          <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E5B8C7] font-semibold">
+                            Centro (2 km): {formatBRL(Number(storeConfig.shippingBaseFee ?? 6) + 2 * Number(storeConfig.shippingPerKm ?? 1.5))}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E5B8C7] font-semibold">
+                            Bairros (4 km): {formatBRL(Number(storeConfig.shippingBaseFee ?? 6) + 4 * Number(storeConfig.shippingPerKm ?? 1.5))}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E5B8C7] font-semibold">
+                            Efapi (8.5 km): {formatBRL(Number(storeConfig.shippingBaseFee ?? 6) + 8.5 * Number(storeConfig.shippingPerKm ?? 1.5))}
+                          </span>
                         </div>
                       </div>
 
@@ -3633,9 +3789,9 @@ export default function App() {
                       </div>
                       <div className="bg-[#FFF9F3] text-[#4A2532] border border-[#EBD5CF] rounded-2xl rounded-bl-xs p-3 leading-relaxed shadow-2xs space-y-1">
                         <p className="font-bold text-[#A90F4D]">Resumo automático nas respostas:</p>
-                        <p>🚚 Frete: {formatBRL(storeConfig.defaultShippingFee || 14.9)} (Grátis acima de {formatBRL(storeConfig.freeShippingMin || 120)})</p>
+                        <p>🚚 Entrega (Chapecó/SC e Região): {formatBRL(storeConfig.shippingBaseFee ?? 6)} + {formatBRL(storeConfig.shippingPerKm ?? 1.5)}/km (Grátis em Chapecó acima de {formatBRL(storeConfig.freeShippingMin || 120)})</p>
                         <p>⏱️ Produção: {storeConfig.productionTimeText || '2 a 5 dias úteis'}</p>
-                        <p>📍 Retirada: {storeConfig.storeLocationText || 'Ateliê Mimo Rosas'}</p>
+                        <p>📍 Retirada: {storeConfig.storeLocationText || 'Ateliê Mimo Rosas - Chapecó/SC'}</p>
                         {storeConfig.assistantExtraNote && <p>✨ {storeConfig.assistantExtraNote}</p>}
                       </div>
                     </div>
@@ -5648,29 +5804,182 @@ export default function App() {
                     </div>
 
                     <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-3">
-                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">2. Entrega ou Retirada</h2>
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">2. Entrega (Chapecó e Região) ou Retirada</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#FCEEF2] text-[#A90F4D] text-[10.5px] font-bold">
+                          📍 Chapecó/SC e Região Próxima
+                        </span>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2.5">
                         <button type="button" onClick={() => setCheckoutData({ ...checkoutData, deliveryMethod: 'delivery' })} className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 ${checkoutData.deliveryMethod === 'delivery' ? 'border-[#A90F4D] bg-[#FCEEF2]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
-                          <Truck className="w-5 h-5 text-[#A90F4D]" /><div><p className="text-xs font-bold text-[#4A2532]">Entrega</p><p className="text-[10px] text-[#795344]">Correios / Motoboy</p></div>
+                          <Truck className="w-5 h-5 text-[#A90F4D] shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-[#4A2532]">Entrega por KM</p>
+                            <p className="text-[10px] text-[#795344]">Chapecó e cidades próximas</p>
+                          </div>
                         </button>
-                        <button type="button" onClick={() => setCheckoutData({ ...checkoutData, deliveryMethod: 'pickup' })} className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 ${checkoutData.deliveryMethod === 'pickup' ? 'border-[#A90F4D] bg-[#FCEEF2]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
-                          <Store className="w-5 h-5 text-[#A90F4D]" /><div><p className="text-xs font-bold text-[#4A2532]">Retirada</p><p className="text-[10px] text-emerald-700 font-semibold">Grátis no Ateliê</p></div>
+                        <button type="button" onClick={() => setCheckoutData({ ...checkoutData, deliveryMethod: 'pickup', outOfArea: false })} className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 ${checkoutData.deliveryMethod === 'pickup' ? 'border-[#A90F4D] bg-[#FCEEF2]' : 'border-[#E5CFC9] bg-[#F6E9E5]'}`}>
+                          <Store className="w-5 h-5 text-[#A90F4D] shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-[#4A2532]">Retirada</p>
+                            <p className="text-[10px] text-emerald-700 font-semibold">Grátis no Ateliê (Chapecó)</p>
+                          </div>
                         </button>
                       </div>
-                      {checkoutData.deliveryMethod === 'delivery' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                          <input type="text" required value={checkoutData.cep} onChange={(e) => setCheckoutData({ ...checkoutData, cep: e.target.value })} placeholder="CEP *" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
-                          <input type="text" required value={checkoutData.city} onChange={(e) => setCheckoutData({ ...checkoutData, city: e.target.value })} placeholder="Cidade / UF *" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
-                          <input type="text" required value={checkoutData.address} onChange={(e) => setCheckoutData({ ...checkoutData, address: e.target.value })} placeholder="Rua / Avenida *" className="sm:col-span-1 px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
-                          <input type="text" required value={checkoutData.number} onChange={(e) => setCheckoutData({ ...checkoutData, number: e.target.value })} placeholder="Número *" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
-                          <input type="text" value={checkoutData.neighborhood} onChange={(e) => setCheckoutData({ ...checkoutData, neighborhood: e.target.value })} placeholder="Bairro" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
-                          <input type="text" value={checkoutData.complement} onChange={(e) => setCheckoutData({ ...checkoutData, complement: e.target.value })} placeholder="Complemento (apto, bloco, etc.)" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
+
+                      {checkoutData.deliveryMethod === 'delivery' ? (
+                        <div className="space-y-3 pt-1">
+                          {/* Seletor rápido de Bairro de Chapecó ou Cidade da Região */}
+                          <div className="p-3 rounded-2xl bg-[#F6E9E5]/80 border border-[#DFC3BC] space-y-2 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="font-bold text-[#4A2532]">
+                                📍 Selecione seu Bairro (Chapecó) ou Cidade Próxima:
+                              </label>
+                              <span className="text-[11px] font-bold text-[#A90F4D]">
+                                ~{activeDistanceKm} km • {shippingFee === 0 ? 'Frete Grátis!' : formatBRL(shippingFee)}
+                              </span>
+                            </div>
+                            <select
+                              value={checkoutData.regionZoneId || 'chapeco-passo'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const found = CHAPECO_REGION_ZONES.find((z) => z.id === val);
+                                if (found) {
+                                  setCheckoutData((prev) => ({
+                                    ...prev,
+                                    regionZoneId: found.id,
+                                    distanceKm: found.km,
+                                    city: found.city,
+                                    outOfArea: false
+                                  }));
+                                }
+                              }}
+                              className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#DFC3BC] text-xs font-semibold text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
+                            >
+                              <optgroup label="Bairros de Chapecó/SC">
+                                {CHAPECO_REGION_ZONES.filter((z) => z.id.startsWith('chapeco-')).map((z) => {
+                                  const fVal = Number(storeConfig.shippingBaseFee ?? 6) + z.km * Number(storeConfig.shippingPerKm ?? 1.5);
+                                  return (
+                                    <option key={z.id} value={z.id}>
+                                      {z.label} ({z.km} km — {formatBRL(fVal)})
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                              <optgroup label="Cidades Próximas (Região de Chapecó)">
+                                {CHAPECO_REGION_ZONES.filter((z) => !z.id.startsWith('chapeco-')).map((z) => {
+                                  const fVal = Number(storeConfig.shippingBaseFee ?? 6) + z.km * Number(storeConfig.shippingPerKm ?? 1.5);
+                                  return (
+                                    <option key={z.id} value={z.id}>
+                                      {z.label} ({formatBRL(fVal)})
+                                    </option>
+                                  );
+                                })}
+                              </optgroup>
+                            </select>
+                            <p className="text-[10.5px] text-[#795344]">
+                              Cálculo automático: Taxa base {formatBRL(storeConfig.shippingBaseFee ?? 6)} + {formatBRL(storeConfig.shippingPerKm ?? 1.5)}/km
+                              {Number(storeConfig.freeShippingMin || 0) > 0 && (
+                                <> • <strong className="text-emerald-700">Frete Grátis em Chapecó acima de {formatBRL(storeConfig.freeShippingMin)}</strong></>
+                              )}
+                            </p>
+                          </div>
+
+                          {checkoutData.outOfArea && (
+                            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-1.5">
+                              <p className="font-bold flex items-center gap-1.5">
+                                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                                <span>Atenção: Entregas somente para Chapecó/SC e cidades próximas</span>
+                              </p>
+                              <p className="text-[11px]">
+                                O CEP informado parece ser de fora da nossa região de entrega. Escolha uma cidade próxima acima, selecione <strong>Retirada Grátis no Ateliê</strong> ou fale conosco no WhatsApp!
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                value={checkoutData.cep}
+                                onChange={(e) => handleCepLookup(e.target.value)}
+                                placeholder="CEP (Ex: 89802-110) *"
+                                className="w-full px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                              />
+                              {checkoutData.cepLoading && (
+                                <Loader2 className="w-4 h-4 text-[#A90F4D] animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              required
+                              value={checkoutData.city || 'Chapecó/SC'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const matched = matchZoneByCityAndNeighborhood(val, checkoutData.neighborhood, checkoutData.cep);
+                                setCheckoutData({
+                                  ...checkoutData,
+                                  city: val,
+                                  distanceKm: matched.zone ? matched.zone.km : checkoutData.distanceKm,
+                                  regionZoneId: matched.zone ? matched.zone.id : checkoutData.regionZoneId,
+                                  outOfArea: matched.outOfArea
+                                });
+                              }}
+                              placeholder="Cidade / UF (Ex: Chapecó/SC) *"
+                              className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                            />
+                            <input type="text" required value={checkoutData.address} onChange={(e) => setCheckoutData({ ...checkoutData, address: e.target.value })} placeholder="Rua / Avenida *" className="sm:col-span-1 px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
+                            <input type="text" required value={checkoutData.number} onChange={(e) => setCheckoutData({ ...checkoutData, number: e.target.value })} placeholder="Número *" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
+                            <input
+                              type="text"
+                              required
+                              value={checkoutData.neighborhood}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const matched = matchZoneByCityAndNeighborhood(checkoutData.city || 'Chapecó/SC', val, checkoutData.cep);
+                                setCheckoutData({
+                                  ...checkoutData,
+                                  neighborhood: val,
+                                  distanceKm: matched.zone ? matched.zone.km : checkoutData.distanceKm,
+                                  regionZoneId: matched.zone ? matched.zone.id : checkoutData.regionZoneId
+                                });
+                              }}
+                              placeholder="Bairro *"
+                              className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm"
+                            />
+                            <input type="text" value={checkoutData.complement} onChange={(e) => setCheckoutData({ ...checkoutData, complement: e.target.value })} placeholder="Complemento (apto, bloco, ponto de ref.)" className="px-3.5 py-2 rounded-xl bg-[#F6E9E5] border border-[#E5CFC9] text-sm" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                          <p className="font-bold flex items-center gap-1.5">
+                            <Store className="w-4 h-4 text-emerald-700" />
+                            <span>Retirada Gratuita • {storeConfig.storeLocationText || 'Ateliê Mimo Rosas - Chapecó/SC'}</span>
+                          </p>
+                          <p className="text-[11px] text-emerald-800">
+                            Assim que seu pedido ficar pronto, avisamos você por e-mail e WhatsApp com o horário e endereço completo para retirada em Chapecó!
+                          </p>
                         </div>
                       )}
                     </div>
 
                     <div className="bg-[#FFF9F3] rounded-3xl p-4 sm:p-5 border border-[#EBD5CF] space-y-4 lg:col-span-2">
-                      <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento Transparente na Loja ({formatBRL(cartTotal)})</h2>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EFE0DC] pb-3">
+                        <h2 className="font-serif-display text-lg font-semibold text-[#4A2532]">3. Pagamento Transparente na Loja</h2>
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          <span className="text-[#795344]">Produtos: <strong>{formatBRL(cartSubtotal)}</strong></span>
+                          <span className="text-[#795344]">
+                            {checkoutData.deliveryMethod === 'pickup'
+                              ? <>Retirada: <strong className="text-emerald-700">Grátis</strong></>
+                              : <>Frete ({activeDistanceKm} km): <strong className={shippingFee === 0 ? 'text-emerald-700' : 'text-[#4A2532]'}>{shippingFee === 0 ? 'Grátis' : formatBRL(shippingFee)}</strong></>}
+                          </span>
+                          <span className="px-3 py-1 rounded-full bg-[#FCEEF2] text-[#A90F4D] font-bold text-sm">
+                            Total: {formatBRL(cartTotal)}
+                          </span>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* BOTÃO PIX TRANSPARENTE */}
                         <button
@@ -5881,11 +6190,11 @@ export default function App() {
               </div>
               <div className="space-y-2.5">
                 <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[#9A7468]">Pagamento e Entrega</h3>
-                <p className="text-sm text-[#6D493B] leading-relaxed">PIX instantâneo e cartão de crédito via Mercado Pago. Envio para todo o Brasil e retirada no ateliê.</p>
-                <div className="flex items-center gap-2 pt-1">
+                <p className="text-sm text-[#6D493B] leading-relaxed">PIX instantâneo e cartão de crédito direto na loja. Entregas exclusivas para Chapecó/SC e região próxima (cálculo por KM) e retirada grátis no ateliê.</p>
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
                   <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">PIX</span>
                   <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">Cartão</span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">Mercado Pago</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#F6E9E5] text-[11px] font-semibold text-[#A90F4D]">Chapecó e Região</span>
                 </div>
               </div>
             </div>
