@@ -815,8 +815,27 @@ export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToke
   }
 
   // 3. Executa a cobrança transparente no Mercado Pago (/v1/payments)
-  const { firstName, lastName } = splitFullName(order.customer || holderName);
-  const email = String(order.email || '').trim() || `cliente.${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}@mimorosas.com.br`;
+  // Usa o nome impresso no cartão para o pagador do cartão, evitando conflito se o admin estiver logado na loja
+  const { firstName, lastName } = splitFullName(holderName || order.customer);
+  let email = String(order.email || '').trim() || `cliente.${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}@mimorosas.com.br`;
+
+  // Verifica os dados do dono da conta Mercado Pago (collector) para:
+  // 1) Se o admin estiver logado com o próprio e-mail (ex: davipro13@gmail.com) mas testando com o cartão/CPF de outra pessoa,
+  //    não enviar o e-mail do próprio vendedor como comprador (o que faria o Mercado Pago bloquear por autofinanciamento).
+  let collectorInfo = null;
+  try {
+    const meRes = await fetch('https://api.mercadopago.com/users/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (meRes.ok) {
+      collectorInfo = await meRes.json();
+      const ownerEmail = String(collectorInfo?.email || '').trim().toLowerCase();
+      if (ownerEmail && email.toLowerCase() === ownerEmail) {
+        email = `cliente.${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}@mimorosas.com.br`;
+      }
+    }
+  } catch { /* ignore */ }
+
   const phoneDigits = onlyDigits(order.phone || '');
   const areaCode = phoneDigits.length >= 10 ? phoneDigits.slice(0, 2) : '49';
   const phoneNumber = phoneDigits.length >= 10 ? phoneDigits.slice(2) : phoneDigits || '999999999';
@@ -848,7 +867,8 @@ export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToke
     ...(issuerId ? { issuer_id: Number(issuerId) || issuerId } : {}),
     external_reference: orderId,
     statement_descriptor: 'MIMOROSAS',
-    binary_mode: false,
+    // binary_mode: true obriga o Mercado Pago a aprovar ou recusar na hora (sem cair em "in_process" nem abrir tela de PIX)
+    binary_mode: true,
     additional_info: {
       items: orderItems,
       payer: {
@@ -911,39 +931,18 @@ export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToke
     };
   }
 
-  if (status === 'in_process' || status === 'pending') {
-    if (paymentId) await updateOrderMpPaymentId(orderId, paymentId);
-    return {
-      ok: true,
-      paid: false,
-      status,
-      paymentId,
-      message: 'Seu pagamento com cartão está em análise rápida pela operadora e será confirmado em instantes.'
-    };
-  }
-
-  // Se o Mercado Pago recusou por antifraude, verifica se a pessoa está tentando pagar com o mesmo CPF/e-mail do dono da conta Mercado Pago (autofinanciamento)
+  // Se o Mercado Pago recusou por antifraude, verifica se a pessoa está tentando pagar com o mesmo CPF/nome do dono da conta Mercado Pago (autofinanciamento)
   let customRejectionMsg = translateMpRejection(statusDetail);
-  if (statusDetail === 'cc_rejected_high_risk' || statusDetail === 'cc_rejected_blacklist' || statusDetail === 'cc_rejected_other_reason') {
-    try {
-      const meRes = await fetch('https://api.mercadopago.com/users/me', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (meRes.ok) {
-        const me = await meRes.json();
-        const ownerDoc = onlyDigits(me?.identification?.number || '');
-        const ownerEmail = String(me?.email || '').trim().toLowerCase();
-        const ownerLast = String(me?.last_name || '').trim().toUpperCase();
-        if (
-          (ownerDoc && docClean === ownerDoc) ||
-          (ownerEmail && email.toLowerCase() === ownerEmail) ||
-          (ownerLast && holderName.toUpperCase().includes(ownerLast))
-        ) {
-          customRejectionMsg =
-            'O Mercado Pago não permite pagar com cartão de crédito quando o comprador é o próprio dono da conta Mercado Pago da loja (mesmo CPF, nome ou e-mail — regra contra autofinanciamento). Para testar compras no cartão, use o cartão, CPF e e-mail de outra pessoa!';
-        }
-      }
-    } catch { /* ignore */ }
+  if (collectorInfo) {
+    const ownerDoc = onlyDigits(collectorInfo?.identification?.number || '');
+    const ownerLast = String(collectorInfo?.last_name || '').trim().toUpperCase();
+    if (
+      (ownerDoc && docClean === ownerDoc) ||
+      (ownerLast && holderName.toUpperCase().includes(ownerLast))
+    ) {
+      customRejectionMsg =
+        'O Mercado Pago bloqueou porque o cartão/CPF usado pertence ao próprio dono da conta Mercado Pago da loja (Davi Schaffer — regra contra autofinanciamento). Teste com o cartão e CPF de outra pessoa!';
+    }
   }
 
   return {

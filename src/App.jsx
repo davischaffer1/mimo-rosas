@@ -2063,7 +2063,7 @@ export default function App() {
         });
         const cardResult = await cardRes.json().catch(() => ({}));
 
-        if (!cardRes.ok || !cardResult?.ok) {
+        if (!cardRes.ok || !cardResult?.ok || (!cardResult?.paid && cardResult?.status !== 'approved')) {
           setCardError(
             cardResult?.message ||
             'Não foi possível aprovar o cartão agora. Confira os dados digitados ou escolha o PIX Instantâneo.'
