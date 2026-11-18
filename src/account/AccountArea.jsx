@@ -270,18 +270,18 @@ export default function AccountArea({ auth, products = [], favoriteIds = [], ren
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0]">
-          <span className="text-[11px] text-[#795344] font-medium">Pedidos</span>
-          <p className="text-2xl font-bold text-[#A90F4D] mt-1">{orders.length}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-[#FFF9F3] rounded-2xl p-3 sm:p-4 border border-[#EAD6D0] min-w-0">
+          <span className="text-[10.5px] sm:text-[11px] text-[#795344] font-medium block truncate">Pedidos</span>
+          <p className="text-lg sm:text-2xl font-bold text-[#A90F4D] mt-0.5 sm:mt-1 truncate">{orders.length}</p>
         </div>
-        <div className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0]">
-          <span className="text-[11px] text-[#795344] font-medium">Total gasto</span>
-          <p className="text-2xl font-bold text-[#4A2532] mt-1">{brl(totalSpent)}</p>
+        <div className="bg-[#FFF9F3] rounded-2xl p-3 sm:p-4 border border-[#EAD6D0] min-w-0">
+          <span className="text-[10.5px] sm:text-[11px] text-[#795344] font-medium block truncate">Total gasto</span>
+          <p className="text-base sm:text-2xl font-bold text-[#4A2532] mt-0.5 sm:mt-1 truncate">{brl(totalSpent)}</p>
         </div>
-        <div className="bg-[#FFF9F3] rounded-2xl p-4 border border-[#EAD6D0]">
-          <span className="text-[11px] text-[#795344] font-medium">Favoritos</span>
-          <p className="text-2xl font-bold text-[#A90F4D] mt-1">{favorites.length}</p>
+        <div className="bg-[#FFF9F3] rounded-2xl p-3 sm:p-4 border border-[#EAD6D0] min-w-0">
+          <span className="text-[10.5px] sm:text-[11px] text-[#795344] font-medium block truncate">Favoritos</span>
+          <p className="text-lg sm:text-2xl font-bold text-[#A90F4D] mt-0.5 sm:mt-1 truncate">{favorites.length}</p>
         </div>
       </div>
 

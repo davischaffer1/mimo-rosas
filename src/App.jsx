@@ -2468,43 +2468,44 @@ export default function App() {
     const normVars = normalizeVariationsList(product.variations);
     const hasMultipleVars = normVars.length > 1 || (normVars.length === 1 && normVars[0].name.toLowerCase() !== 'padrão');
     const varsWithPhotos = normVars.filter((v) => v.image);
+    const isCustomProd = extractProductCustomization(product).enabled || extractProductCustomization(product).addonGroups?.length > 0;
     return (
-      <div key={product.id} onClick={() => openProductDetail(product)} className="group bg-[#FFF9F3] rounded-[22px] overflow-hidden border border-[#F0DCD6] shadow-[0_6px_20px_rgba(121,83,68,0.07)] hover:shadow-[0_10px_26px_rgba(169,15,77,0.13)] transition-all duration-300 flex flex-col cursor-pointer">
-        <div className="relative aspect-[1.05/1] w-full overflow-hidden bg-[#F6E9E5]">
+      <div key={product.id} onClick={() => openProductDetail(product)} className="group bg-[#FFF9F3] rounded-[18px] sm:rounded-[22px] overflow-hidden border border-[#F0DCD6] shadow-[0_6px_20px_rgba(121,83,68,0.07)] hover:shadow-[0_10px_26px_rgba(169,15,77,0.13)] transition-all duration-300 flex flex-col cursor-pointer min-w-0">
+        <div className="relative aspect-square sm:aspect-[1.05/1] w-full overflow-hidden bg-[#F6E9E5]">
           <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           {product.badge && (
-            <div className="absolute top-2.5 left-2.5 bg-[#FFF9F3]/95 backdrop-blur-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs border border-[#F2DFDA]">
-              {product.badgeType === 'star' ? <Star className="w-3.5 h-3.5 text-[#A90F4D]" strokeWidth={2.2} /> : <Sparkles className="w-3.5 h-3.5 text-[#A90F4D]" strokeWidth={2.2} />}
-              <span className="text-[11px] font-medium text-[#5A382E] leading-none">{product.badge}</span>
+            <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 max-w-[calc(100%-3rem)] bg-[#FFF9F3]/95 backdrop-blur-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shadow-xs border border-[#F2DFDA]">
+              {product.badgeType === 'star' ? <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#A90F4D] shrink-0" strokeWidth={2.2} /> : <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#A90F4D] shrink-0" strokeWidth={2.2} />}
+              <span className="text-[10px] sm:text-[11px] font-medium text-[#5A382E] leading-none truncate">{product.badge}</span>
             </div>
           )}
-          <button type="button" onClick={(e) => toggleFavorite(product.id, e)} aria-label="Favoritar produto" className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-[#FFF9F3]/85 backdrop-blur-xs flex items-center justify-center text-[#A90F4D] hover:scale-110 active:scale-95 transition-transform shadow-xs">
-            <Heart className="w-4 h-4" fill={isFav ? '#A90F4D' : 'none'} strokeWidth={2} />
+          <button type="button" onClick={(e) => toggleFavorite(product.id, e)} aria-label="Favoritar produto" className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFF9F3]/90 backdrop-blur-xs flex items-center justify-center text-[#A90F4D] hover:scale-110 active:scale-95 transition-transform shadow-xs">
+            <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill={isFav ? '#A90F4D' : 'none'} strokeWidth={2} />
           </button>
           {varsWithPhotos.length > 0 && (
-            <div className="absolute bottom-2 left-2.5 flex items-center -space-x-1.5 bg-[#FFF9F3]/90 backdrop-blur-xs px-2 py-1 rounded-full border border-[#F0DCD6] shadow-xs">
-              {varsWithPhotos.slice(0, 4).map((v, i) => (
-                <img key={i} src={v.image} alt={v.name} title={v.name} className="w-4 h-4 rounded-full object-cover border border-white" />
+            <div className="absolute bottom-1.5 left-2 sm:bottom-2 sm:left-2.5 flex items-center -space-x-1.5 bg-[#FFF9F3]/90 backdrop-blur-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full border border-[#F0DCD6] shadow-xs">
+              {varsWithPhotos.slice(0, 3).map((v, i) => (
+                <img key={i} src={v.image} alt={v.name} title={v.name} className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full object-cover border border-white" />
               ))}
-              <span className="text-[10px] font-semibold text-[#5A382E] pl-2.5">{normVars.length} {normVars.length === 1 ? 'opção' : 'opções'}</span>
+              <span className="text-[9.5px] sm:text-[10px] font-semibold text-[#5A382E] pl-2">{normVars.length} {normVars.length === 1 ? 'opção' : 'opções'}</span>
             </div>
           )}
         </div>
-        <div className="p-3 sm:p-4 flex flex-col flex-1 justify-between text-center bg-gradient-to-b from-[#FFF9F3] to-[#FDF3EE]">
-          <div>
-            <h3 className="font-serif-display text-[15px] sm:text-[16px] font-medium text-[#4A2C23] leading-snug line-clamp-2 min-h-[40px]">{product.name}</h3>
-            <p className="mt-1.5 text-[18px] sm:text-[20px] font-bold text-[#A90F4D] tracking-tight">{formatBRL(product.price)}</p>
+        <div className="p-2.5 sm:p-4 flex flex-col flex-1 justify-between text-center bg-gradient-to-b from-[#FFF9F3] to-[#FDF3EE] min-w-0">
+          <div className="min-w-0">
+            <h3 className="font-serif-display text-[13.5px] sm:text-[16px] font-medium text-[#4A2C23] leading-snug line-clamp-2 min-h-[36px] sm:min-h-[42px]">{product.name}</h3>
+            <p className="mt-1 text-[16px] sm:text-[20px] font-bold text-[#A90F4D] tracking-tight">{formatBRL(product.price)}</p>
             {hasMultipleVars && varsWithPhotos.length === 0 && (
-              <p className="text-[10.5px] text-[#8B6456] mt-0.5 truncate">{normVars.length} opções: {normVars.map((v) => v.name).join(', ')}</p>
+              <p className="text-[10px] text-[#8B6456] mt-0.5 truncate">{normVars.length} opções</p>
             )}
           </div>
-          <button type="button" onClick={(e) => addToCart(product, 1, null, e)} className={`mt-2.5 w-full py-2.5 px-3 rounded-full text-[12px] sm:text-[13px] font-medium flex items-center justify-center gap-1.5 shadow-sm transition-all duration-200 active:scale-95 ${isAdded ? 'bg-[#2E7D32] text-white' : 'bg-[#A90F4D] hover:bg-[#8E0B3F] text-white'}`}>
+          <button type="button" onClick={(e) => addToCart(product, 1, null, e)} className={`mt-2 sm:mt-2.5 w-full py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-full text-[11.5px] sm:text-[13px] font-medium flex items-center justify-center gap-1 sm:gap-1.5 shadow-sm transition-all duration-200 active:scale-95 whitespace-nowrap ${isAdded ? 'bg-[#2E7D32] text-white' : 'bg-[#A90F4D] hover:bg-[#8E0B3F] text-white'}`}>
             {isAdded ? (
-              <><Check className="w-4 h-4 stroke-[2.5]" /><span>Adicionado!</span></>
-            ) : (extractProductCustomization(product).enabled || extractProductCustomization(product).addonGroups?.length > 0) ? (
-              <><Sparkles className="w-3.5 h-3.5" /><span>Personalizar / Escolher</span></>
+              <><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0" /><span>Adicionado!</span></>
+            ) : isCustomProd ? (
+              <><Sparkles className="w-3.5 h-3.5 shrink-0" /><span className="sm:hidden">Personalizar</span><span className="hidden sm:inline">Personalizar / Escolher</span></>
             ) : (
-              <><ShoppingCart className="w-3.5 h-3.5" /><span>Adicionar ao carrinho</span></>
+              <><ShoppingCart className="w-3.5 h-3.5 shrink-0" /><span className="sm:hidden">Adicionar</span><span className="hidden sm:inline">Adicionar ao carrinho</span></>
             )}
           </button>
         </div>
@@ -2585,14 +2586,16 @@ export default function App() {
   })();
 
   return (
-    <div className="min-h-screen bg-[#F6E9E5] text-[#5A382E] flex flex-col items-center selection:bg-[#A90F4D] selection:text-white">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#F6E9E5] text-[#5A382E] flex flex-col items-center selection:bg-[#A90F4D] selection:text-white">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Allura&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        html, body { overflow-x: hidden; max-width: 100vw; -webkit-tap-highlight-color: transparent; }
         .font-script { font-family: 'Allura', cursive; }
         .font-serif-display { font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif; }
         .font-sans-clean { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .safe-bottom-nav { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fadeIn { animation: fadeIn 0.25s ease-out; }
         @keyframes bounceDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
@@ -2774,17 +2777,17 @@ export default function App() {
               </div>
 
               {/* Cards de Indicadores (KPIs Executivos) */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                <div className="bg-[#FFF9F3] p-4 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#795344] font-medium">Vendas Confirmadas</span>
-                    <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4" />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+                <div className="bg-[#FFF9F3] p-3.5 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] sm:text-xs text-[#795344] font-medium truncate">Vendas Confirmadas</span>
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </span>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-[#2E7D32] tracking-tight">{formatBRL(confirmedRevenue)}</p>
-                    <p className="text-[11px] text-[#8B6456] mt-0.5">
+                  <div className="mt-2 min-w-0">
+                    <p className="text-lg sm:text-3xl font-bold text-[#2E7D32] tracking-tight truncate">{formatBRL(confirmedRevenue)}</p>
+                    <p className="text-[10.5px] sm:text-[11px] text-[#8B6456] mt-0.5 truncate">
                       {confirmedOrders.length} {confirmedOrders.length === 1 ? 'pedido pago' : 'pedidos pagos'}
                     </p>
                   </div>
@@ -2792,17 +2795,17 @@ export default function App() {
 
                 <div
                   onClick={() => setAdminTab('orders')}
-                  className="bg-[#FFF9F3] p-4 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors"
+                  className="bg-[#FFF9F3] p-3.5 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors min-w-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#795344] font-medium">Para Produzir / Enviar</span>
-                    <span className="w-8 h-8 rounded-xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center">
-                      <ClipboardList className="w-4 h-4" />
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] sm:text-xs text-[#795344] font-medium truncate">Para Produzir / Enviar</span>
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center shrink-0">
+                      <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </span>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-[#4A2532]">{toProduceCount}</p>
-                    <p className="text-[11px] text-[#8B6456] mt-0.5">
+                  <div className="mt-2 min-w-0">
+                    <p className="text-xl sm:text-3xl font-bold text-[#4A2532]">{toProduceCount}</p>
+                    <p className="text-[10.5px] sm:text-[11px] text-[#8B6456] mt-0.5 truncate">
                       {pendingPixCount > 0 ? `+ ${pendingPixCount} aguardando PIX` : `${orders.length} pedidos no total`}
                     </p>
                   </div>
@@ -2810,35 +2813,35 @@ export default function App() {
 
                 <div
                   onClick={() => setAdminTab('products')}
-                  className="bg-[#FFF9F3] p-4 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors"
+                  className="bg-[#FFF9F3] p-3.5 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors min-w-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#795344] font-medium">Produtos Ativos</span>
-                    <span className="w-8 h-8 rounded-xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center">
-                      <Package className="w-4 h-4" />
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] sm:text-xs text-[#795344] font-medium truncate">Produtos Ativos</span>
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#FCEEF2] text-[#A90F4D] flex items-center justify-center shrink-0">
+                      <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </span>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-[#A90F4D]">{activeProductsCount}</p>
-                    <p className={`text-[11px] mt-0.5 ${lowStockCount > 0 ? 'text-amber-700 font-semibold' : 'text-[#8B6456]'}`}>
-                      {lowStockCount > 0 ? `${lowStockCount} com estoque baixo (≤ 3 un.)` : 'Estoque em dia'}
+                  <div className="mt-2 min-w-0">
+                    <p className="text-xl sm:text-3xl font-bold text-[#A90F4D]">{activeProductsCount}</p>
+                    <p className={`text-[10.5px] sm:text-[11px] mt-0.5 truncate ${lowStockCount > 0 ? 'text-amber-700 font-semibold' : 'text-[#8B6456]'}`}>
+                      {lowStockCount > 0 ? `${lowStockCount} estoque baixo` : 'Estoque em dia'}
                     </p>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setAdminTab('assistant')}
-                  className="bg-[#FFF9F3] p-4 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors"
+                  className="bg-[#FFF9F3] p-3.5 sm:p-5 rounded-3xl border border-[#EAD6D0] shadow-2xs flex flex-col justify-between cursor-pointer hover:border-[#A90F4D] transition-colors min-w-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#795344] font-medium">Frete & Atendimento</span>
-                    <span className="w-8 h-8 rounded-xl bg-[#F6E9E5] text-[#5A382E] flex items-center justify-center">
-                      <Truck className="w-4 h-4" />
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] sm:text-xs text-[#795344] font-medium truncate">Frete Chapecó/KM</span>
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#F6E9E5] text-[#5A382E] flex items-center justify-center shrink-0">
+                      <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </span>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-xl sm:text-2xl font-bold text-[#4A2532]">{formatBRL(storeConfig.defaultShippingFee || 14.9)}</p>
-                    <p className="text-[11px] text-[#8B6456] mt-0.5">
+                  <div className="mt-2 min-w-0">
+                    <p className="text-base sm:text-2xl font-bold text-[#4A2532] truncate">{formatBRL(storeConfig.shippingBaseFee ?? 6)} + {formatBRL(storeConfig.shippingPerKm ?? 1.5)}/km</p>
+                    <p className="text-[10.5px] sm:text-[11px] text-[#8B6456] mt-0.5 truncate">
                       Grátis acima de {formatBRL(storeConfig.freeShippingMin || 120)}
                     </p>
                   </div>
@@ -5012,14 +5015,14 @@ export default function App() {
           );
         })()
       ) : (
-        <div className="w-full min-h-screen bg-[#F6E9E5] flex flex-col relative pb-24 lg:pb-0 font-sans-clean">
+        <div className="w-full min-h-screen overflow-x-hidden bg-[#F6E9E5] flex flex-col relative pb-24 lg:pb-0 font-sans-clean">
           <header className="sticky top-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md border-b border-[#EFE0DC]">
-            <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-2.5 lg:py-3">
-              <div className="flex items-center justify-between gap-3 lg:gap-8">
-                <button type="button" onClick={() => setIsSideMenuOpen(true)} aria-label="Abrir menu" className="lg:hidden p-2 -ml-1 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition"><Menu className="w-6 h-6" strokeWidth={1.9} /></button>
-                <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2 focus:outline-none group shrink-0">
-                  <MimoRoseOutlineSVG className="w-10 h-11 sm:w-11 sm:h-12 group-hover:scale-105 transition-transform" />
-                  <span className="font-script text-[34px] sm:text-[42px] text-[#A90F4D] leading-none tracking-wide pt-1">Mimo Rosas</span>
+            <div className="mx-auto w-full max-w-[1320px] px-3 sm:px-4 lg:px-8 py-2 lg:py-3">
+              <div className="flex items-center justify-between gap-2 sm:gap-3 lg:gap-8">
+                <button type="button" onClick={() => setIsSideMenuOpen(true)} aria-label="Abrir menu" className="lg:hidden p-2 -ml-1 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition shrink-0"><Menu className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.9} /></button>
+                <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-1.5 sm:gap-2 focus:outline-none group shrink-0 min-w-0">
+                  <MimoRoseOutlineSVG className="w-8 h-9 sm:w-11 sm:h-12 group-hover:scale-105 transition-transform shrink-0" />
+                  <span className="font-script text-[28px] sm:text-[42px] text-[#A90F4D] leading-none tracking-wide pt-1 truncate">Mimo Rosas</span>
                 </button>
 
                 <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
@@ -5034,7 +5037,7 @@ export default function App() {
                   <button type="button" onClick={() => setIsAssistantOpen(true)} className="px-3.5 py-2 rounded-full text-sm font-medium text-[#5A382E] hover:bg-[#F6E9E5] hover:text-[#A90F4D] transition-colors flex items-center gap-1.5"><Sparkles className="w-4 h-4" />Atendimento</button>
                 </nav>
 
-                <div className="flex items-center gap-1 lg:gap-2">
+                <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2 shrink-0">
                   <div className="hidden lg:flex relative items-center w-[240px] xl:w-[300px]">
                     <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
                     <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar produtos..." className="w-full pl-10 pr-4 py-2 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D] focus:bg-white transition-colors" />
@@ -5054,12 +5057,12 @@ export default function App() {
                   </button>
                   <button type="button" onClick={() => setIsCartOpen(true)} aria-label="Abrir carrinho" className={`relative p-2 rounded-full text-[#A90F4D] hover:bg-[#F6E9E5] active:scale-95 transition ${cartBounce ? 'scale-125' : ''}`}>
                     <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
-                    <span className="absolute top-0.5 right-0.5 min-w-[19px] h-[19px] px-1 rounded-full bg-[#A90F4D] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">{cartCount}</span>
+                    <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#A90F4D] text-white text-[10.5px] font-bold flex items-center justify-center shadow-xs">{cartCount}</span>
                   </button>
                 </div>
               </div>
               {isSearchOpen && (
-                <div className="mt-2.5 pb-1 animate-fadeIn lg:hidden">
+                <div className="mt-2 pb-1 animate-fadeIn lg:hidden">
                   <div className="relative flex items-center">
                     <Search className="w-4 h-4 text-[#A90F4D] absolute left-3.5 pointer-events-none" />
                     <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (activeView !== 'catalog' && activeView !== 'home') setActiveView('catalog'); }} placeholder="Buscar infusões, cápsulas de rosa, cuias..." className="w-full pl-10 pr-9 py-2.5 rounded-full bg-[#F6E9E5] border border-[#E6CFC8] text-sm text-[#4A2C23] placeholder-[#9A7468] focus:outline-none focus:border-[#A90F4D]" autoFocus />
@@ -5070,32 +5073,32 @@ export default function App() {
             </div>
           </header>
 
-          <main className="flex-1">
+          <main className="flex-1 w-full max-w-full overflow-x-hidden">
             {activeView === 'home' && (
               <div>
                 <section className="relative w-full overflow-hidden bg-[#F2D7D3]">
-                  <div className="relative min-h-[300px] sm:min-h-[360px] lg:min-h-[470px] xl:min-h-[520px] w-full flex items-center">
-                    <img src={HERO_SLIDES[heroIndex].image} alt="Banner Mimo Rosas" className="absolute inset-0 w-full h-full object-cover object-[75%_center] lg:object-[80%_center] transition-all duration-700" />
-                    <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(246,226,223,0.98) 0%, rgba(246,226,223,0.92) 48%, rgba(246,226,223,0.25) 78%, rgba(246,226,223,0.05) 100%)' }} />
-                    <div className="relative z-10 mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8 py-6 lg:py-14">
-                      <div className="w-full sm:w-[62%] lg:w-[48%]">
-                        <h1 className="font-serif-display italic text-[26px] sm:text-[34px] lg:text-[46px] xl:text-[54px] text-[#A90F4D] leading-[1.15]">
+                  <div className="relative min-h-[260px] sm:min-h-[360px] lg:min-h-[470px] xl:min-h-[520px] w-full flex items-center">
+                    <img src={HERO_SLIDES[heroIndex].image} alt="Banner Mimo Rosas" className="absolute inset-0 w-full h-full object-cover object-[72%_center] lg:object-[80%_center] transition-all duration-700" />
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(246,226,223,0.97) 0%, rgba(246,226,223,0.91) 56%, rgba(246,226,223,0.32) 85%, rgba(246,226,223,0.08) 100%)' }} />
+                    <div className="relative z-10 mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8 py-6 pb-9 sm:py-8 lg:py-14">
+                      <div className="w-[82%] sm:w-[62%] lg:w-[48%]">
+                        <h1 className="font-serif-display italic text-[23px] sm:text-[34px] lg:text-[46px] xl:text-[54px] text-[#A90F4D] leading-[1.15]">
                           {HERO_SLIDES[heroIndex].titleLine1}<br />
                           <span>{HERO_SLIDES[heroIndex].titleLine2} </span>
-                          <span className="font-script not-italic text-[38px] sm:text-[48px] lg:text-[64px] xl:text-[72px] leading-none">{HERO_SLIDES[heroIndex].titleScript}</span>
+                          <span className="font-script not-italic text-[34px] sm:text-[48px] lg:text-[64px] xl:text-[72px] leading-none">{HERO_SLIDES[heroIndex].titleScript}</span>
                         </h1>
-                        <div className="-ml-2 my-1"><HeartFlourishSVG className="w-52 sm:w-64 lg:w-80 h-7" /></div>
-                        <p className="text-[12.5px] sm:text-[14px] lg:text-[16px] text-[#4E2F26] leading-snug max-w-[240px] sm:max-w-[300px] lg:max-w-[420px] font-normal">{HERO_SLIDES[heroIndex].subtitle}</p>
+                        <div className="-ml-2 my-1"><HeartFlourishSVG className="w-44 sm:w-64 lg:w-80 h-6 sm:h-7" /></div>
+                        <p className="text-[12px] sm:text-[14px] lg:text-[16px] text-[#4E2F26] leading-snug max-w-[235px] sm:max-w-[300px] lg:max-w-[420px] font-normal">{HERO_SLIDES[heroIndex].subtitle}</p>
                         <button type="button" onClick={() => {
                           const target = HERO_SLIDES[heroIndex].targetCategory;
                           if (target === 'all') catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
                           else navigateCategory(target);
-                        }} className="mt-4 lg:mt-6 inline-flex items-center gap-2 bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[13px] sm:text-[14px] lg:text-[15px] font-medium px-5 py-2.5 lg:px-7 lg:py-3.5 rounded-full shadow-[0_6px_16px_rgba(169,15,77,0.32)] active:scale-95 transition-all">
+                        }} className="mt-3.5 sm:mt-4 lg:mt-6 inline-flex items-center gap-2 bg-[#A90F4D] hover:bg-[#8E0B3F] text-white text-[12px] sm:text-[14px] lg:text-[15px] font-medium px-4 py-2 sm:px-5 sm:py-2.5 lg:px-7 lg:py-3.5 rounded-full shadow-[0_6px_16px_rgba(169,15,77,0.32)] active:scale-95 transition-all">
                           <span>{HERO_SLIDES[heroIndex].cta}</span><span className="text-base leading-none">→</span>
                         </button>
                       </div>
                     </div>
-                    <div className="absolute bottom-3 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+                    <div className="absolute bottom-2.5 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
                       {HERO_SLIDES.map((slide, idx) => (
                         <button key={slide.id} type="button" onClick={() => setHeroIndex(idx)} aria-label={`Slide ${idx + 1}`} className={`rounded-full transition-all ${heroIndex === idx ? 'w-2.5 h-2.5 bg-[#A90F4D]' : 'w-2 h-2 bg-[#FFF9F3]/80'}`} />
                       ))}
@@ -5103,29 +5106,29 @@ export default function App() {
                   </div>
                 </section>
 
-                <section className="relative pt-4 lg:pt-8 pb-2">
-                  <div className="relative mx-auto w-full max-w-[1320px] px-4 lg:px-8">
-                    <div ref={categoryScrollRef} className="flex lg:grid lg:grid-cols-8 items-stretch gap-2.5 lg:gap-4 overflow-x-auto lg:overflow-visible no-scrollbar pr-8 lg:pr-0 py-1">
+                <section className="relative pt-3.5 sm:pt-4 lg:pt-8 pb-2">
+                  <div className="relative mx-auto w-full max-w-[1320px] px-3.5 sm:px-4 lg:px-8">
+                    <div ref={categoryScrollRef} className="flex lg:grid lg:grid-cols-8 items-stretch gap-2 sm:gap-2.5 lg:gap-4 overflow-x-auto lg:overflow-visible no-scrollbar snap-x snap-mandatory pr-9 lg:pr-0 py-1">
                       {categories.map((cat) => {
                         const isSelected = selectedCategory === cat.id;
                         return (
-                          <button key={cat.id} type="button" onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)} className={`flex-shrink-0 w-[96px] sm:w-[116px] lg:w-auto rounded-[20px] p-2.5 lg:p-4 flex flex-col items-center justify-start text-center transition-all duration-200 border ${isSelected ? 'bg-[#FFF9F3] border-[#A90F4D] shadow-md -translate-y-0.5' : 'bg-[#F9ECE8] hover:bg-[#FFF9F3] border-[#F0DCD6] shadow-[0_4px_12px_rgba(121,83,68,0.06)]'}`}>
-                            <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center mb-1 lg:mb-2"><CategoryIconSVG type={cat.iconType} /></div>
-                            <span className="text-[11px] sm:text-[12px] lg:text-[13px] font-medium text-[#4E2F26] leading-[1.2] line-clamp-3">{cat.shortName}</span>
+                          <button key={cat.id} type="button" onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)} className={`snap-start flex-shrink-0 w-[90px] sm:w-[114px] lg:w-auto rounded-[18px] sm:rounded-[20px] p-2 sm:p-2.5 lg:p-4 flex flex-col items-center justify-start text-center transition-all duration-200 border ${isSelected ? 'bg-[#FFF9F3] border-[#A90F4D] shadow-md -translate-y-0.5' : 'bg-[#F9ECE8] hover:bg-[#FFF9F3] border-[#F0DCD6] shadow-[0_4px_12px_rgba(121,83,68,0.06)]'}`}>
+                            <div className="w-10 h-10 sm:w-11 sm:h-11 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center mb-1 lg:mb-2"><CategoryIconSVG type={cat.iconType} /></div>
+                            <span className="text-[10.5px] sm:text-[12px] lg:text-[13px] font-medium text-[#4E2F26] leading-[1.2] line-clamp-3">{cat.shortName}</span>
                           </button>
                         );
                       })}
                     </div>
-                    <button type="button" onClick={scrollCategoriesRight} aria-label="Rolar categorias" className="lg:hidden absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#FFF9F3] border border-[#EBD5CF] shadow-md flex items-center justify-center text-[#A90F4D] hover:scale-105 active:scale-95 transition"><ChevronRight className="w-4 h-4" /></button>
+                    <button type="button" onClick={scrollCategoriesRight} aria-label="Rolar categorias" className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FFF9F3]/95 border border-[#EBD5CF] shadow-md flex items-center justify-center text-[#A90F4D] hover:scale-105 active:scale-95 transition"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </section>
 
-                <section ref={catalogSectionRef} className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 pt-4 lg:pt-10 pb-4">
-                  <div className="flex items-center justify-center gap-3 mb-4 lg:mb-7">
+                <section ref={catalogSectionRef} className="mx-auto w-full max-w-[1320px] px-3 sm:px-4 lg:px-8 pt-3.5 sm:pt-4 lg:pt-10 pb-4">
+                  <div className="flex items-center justify-center gap-3 mb-3.5 sm:mb-4 lg:mb-7">
                     <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
                     <h2 className="text-center flex items-baseline gap-2">
-                      <span className="font-serif-display text-[22px] sm:text-[26px] lg:text-[30px] text-[#4E2F26] font-normal">Nossos</span>
-                      <span className="font-script text-[40px] sm:text-[46px] lg:text-[56px] text-[#A90F4D] leading-none">Destaques</span>
+                      <span className="font-serif-display text-[20px] sm:text-[26px] lg:text-[30px] text-[#4E2F26] font-normal">Nossos</span>
+                      <span className="font-script text-[36px] sm:text-[46px] lg:text-[56px] text-[#A90F4D] leading-none">Destaques</span>
                     </h2>
                     <div className="h-[1px] flex-1 bg-[#E2B8C4]" />
                   </div>
@@ -5135,31 +5138,31 @@ export default function App() {
                       <button type="button" onClick={() => { setSelectedCategory('all'); setSearchQuery(''); }} className="text-[#A90F4D] font-semibold hover:underline ml-2 shrink-0">Ver todos</button>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
                     {(selectedCategory === 'all' && !searchQuery ? featuredProducts : filteredProducts).map((product) => renderProductCard(product))}
                   </div>
                   {selectedCategory === 'all' && !searchQuery && (
                     <div className="mt-5 text-center">
-                      <button type="button" onClick={() => setActiveView('catalog')} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FFF9F3] border border-[#D9B2BE] text-[#A90F4D] text-xs sm:text-sm font-semibold shadow-xs hover:bg-[#A90F4D] hover:text-white transition-colors">
+                      <button type="button" onClick={() => setActiveView('catalog')} className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-full bg-[#FFF9F3] border border-[#D9B2BE] text-[#A90F4D] text-xs sm:text-sm font-semibold shadow-xs hover:bg-[#A90F4D] hover:text-white transition-colors">
                         <span>Ver todos os {visibleProducts.length} produtos da loja</span><ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   )}
                 </section>
 
-                <section className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 pt-1 lg:pt-6 pb-4 lg:pb-12">
-                  <div className="relative rounded-[26px] overflow-hidden p-4 sm:p-6 lg:p-9 text-[#FFF9F3] shadow-[0_10px_28px_rgba(169,15,77,0.25)]" style={{ background: 'linear-gradient(100deg, #980B44 0%, #A90F4D 58%, #C43B6E 100%)' }}>
-                    <div className="relative z-10 flex items-center gap-3.5 sm:gap-6 lg:gap-10">
-                      <div className="shrink-0"><MimoRoseOutlineSVG className="w-16 h-20 sm:w-20 sm:h-24 lg:w-28 lg:h-32" strokeColor="#FFF9F3" /></div>
+                <section className="mx-auto w-full max-w-[1320px] px-3 sm:px-4 lg:px-8 pt-1 lg:pt-6 pb-4 lg:pb-12">
+                  <div className="relative rounded-[22px] sm:rounded-[26px] overflow-hidden p-4 sm:p-6 lg:p-9 text-[#FFF9F3] shadow-[0_10px_28px_rgba(169,15,77,0.25)]" style={{ background: 'linear-gradient(100deg, #980B44 0%, #A90F4D 58%, #C43B6E 100%)' }}>
+                    <div className="relative z-10 flex items-center gap-3 sm:gap-6 lg:gap-10">
+                      <div className="shrink-0"><MimoRoseOutlineSVG className="w-14 h-16 sm:w-20 sm:h-24 lg:w-28 lg:h-32" strokeColor="#FFF9F3" /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-serif-display text-[17px] sm:text-[22px] lg:text-[30px] leading-tight">Artesanal, <span className="italic font-normal">com muito</span> <span className="font-script text-[29px] sm:text-[36px] lg:text-[46px] leading-none">amor</span></h3>
+                          <h3 className="font-serif-display text-[16px] sm:text-[22px] lg:text-[30px] leading-tight">Artesanal, <span className="italic font-normal">com muito</span> <span className="font-script text-[26px] sm:text-[36px] lg:text-[46px] leading-none">amor</span></h3>
                           <Heart className="w-4 h-4 lg:w-5 lg:h-5 text-[#FAD4E0] inline shrink-0" />
                         </div>
-                        <div className="w-44 lg:w-64 h-[1px] bg-[#F6B8CC]/60 my-1.5" />
+                        <div className="w-36 sm:w-44 lg:w-64 h-[1px] bg-[#F6B8CC]/60 my-1.5" />
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 lg:gap-6 mt-1">
-                          <p className="text-[11.5px] sm:text-[13px] lg:text-[15px] text-[#FCEEF2] leading-snug max-w-[210px] sm:max-w-[300px] lg:max-w-[420px]">Cuidados em cada detalhe para encantar em cada escolha.</p>
-                          <button type="button" onClick={() => setIsAboutModalOpen(true)} className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 bg-[#FCE5EC] hover:bg-white text-[#A90F4D] text-[11.5px] sm:text-[12.5px] lg:text-[14px] font-semibold px-3.5 py-2 lg:px-6 lg:py-3 rounded-full shadow-sm active:scale-95 transition"><span>Sobre a Mimo Rosas</span><span>→</span></button>
+                          <p className="text-[11.5px] sm:text-[13px] lg:text-[15px] text-[#FCEEF2] leading-snug max-w-[230px] sm:max-w-[300px] lg:max-w-[420px]">Cuidados em cada detalhe para encantar em cada escolha.</p>
+                          <button type="button" onClick={() => setIsAboutModalOpen(true)} className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 bg-[#FCE5EC] hover:bg-white text-[#A90F4D] text-[11px] sm:text-[12.5px] lg:text-[14px] font-semibold px-3.5 py-2 lg:px-6 lg:py-3 rounded-full shadow-sm active:scale-95 transition"><span>Sobre a Mimo Rosas</span><span>→</span></button>
                         </div>
                       </div>
                     </div>
@@ -5169,13 +5172,13 @@ export default function App() {
             )}
 
             {activeView === 'catalog' && (
-              <div className="mx-auto w-full max-w-[1320px] px-4 lg:px-8 py-4 lg:py-8 space-y-4 lg:space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="mx-auto w-full max-w-[1320px] px-3 sm:px-4 lg:px-8 py-4 lg:py-8 space-y-3.5 sm:space-y-4 lg:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2.5">
+                  <div className="min-w-0">
                     <button type="button" onClick={() => setActiveView('home')} className="inline-flex items-center gap-1 text-xs text-[#A90F4D] font-semibold mb-1"><ChevronLeft className="w-4 h-4" /><span>Voltar ao Início</span></button>
-                    <h1 className="font-serif-display text-2xl lg:text-3xl text-[#4E2F26] font-semibold">{selectedCategory === 'all' ? 'Catálogo Completo' : categories.find((c) => c.id === selectedCategory)?.name}</h1>
+                    <h1 className="font-serif-display text-xl sm:text-2xl lg:text-3xl text-[#4E2F26] font-semibold leading-snug">{selectedCategory === 'all' ? 'Catálogo Completo' : categories.find((c) => c.id === selectedCategory)?.name}</h1>
                   </div>
-                  <div className="flex items-center gap-1.5 bg-[#FFF9F3] px-3 py-1.5 rounded-full border border-[#EBD5CF] text-xs">
+                  <div className="self-start sm:self-auto shrink-0 flex items-center gap-1.5 bg-[#FFF9F3] px-3 py-1.5 rounded-full border border-[#EBD5CF] text-xs">
                     <SlidersHorizontal className="w-3.5 h-3.5 text-[#A90F4D]" />
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent text-[#4E2F26] font-medium focus:outline-none">
                       <option value="featured">Destaques</option>
@@ -5190,7 +5193,7 @@ export default function App() {
                     <button key={cat.id} type="button" onClick={() => setSelectedCategory(cat.id)} className={`px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${selectedCategory === cat.id ? 'bg-[#A90F4D] text-white' : 'bg-[#FFF9F3] text-[#5A382E] border border-[#EBD5CF]'}`}>{cat.shortName}</button>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3.5 lg:gap-6">
                   {filteredProducts.map((product) => renderProductCard(product))}
                 </div>
               </div>
@@ -6262,21 +6265,21 @@ export default function App() {
             </div>
           </footer>
 
-          <button type="button" onClick={() => setIsAssistantOpen(true)} className="fixed bottom-[76px] right-3 sm:right-6 lg:bottom-8 lg:right-8 z-30 bg-[#FFF9F3] hover:bg-white text-[#3B231C] pl-2 pr-4 py-2 rounded-full shadow-[0_8px_24px_rgba(89,40,58,0.22)] border border-[#EBD5CF] flex items-center gap-2 active:scale-95 transition-all">
-            <span className="relative w-8 h-8 rounded-full bg-[#38C958] flex items-center justify-center text-white shadow-xs">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2Z" /></svg>
+          <button type="button" onClick={() => setIsAssistantOpen(true)} className="fixed bottom-[72px] right-3 sm:right-6 lg:bottom-8 lg:right-8 z-30 bg-[#FFF9F3] hover:bg-white text-[#3B231C] pl-1.5 pr-3 sm:pl-2 sm:pr-4 py-1.5 sm:py-2 rounded-full shadow-[0_8px_24px_rgba(89,40,58,0.22)] border border-[#EBD5CF] flex items-center gap-1.5 sm:gap-2 active:scale-95 transition-all">
+            <span className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#38C958] flex items-center justify-center text-white shadow-xs shrink-0">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 fill-current"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2Z" /></svg>
             </span>
-            <span className="text-[12.5px] font-semibold tracking-tight">Vamos conversar?</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#38C958]" />
+            <span className="text-[11.5px] sm:text-[12.5px] font-semibold tracking-tight">Vamos conversar?</span>
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#38C958] shrink-0" />
           </button>
 
-          <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FFF9F3] border-t border-[#EAD6D0] px-2 pt-1.5 pb-2 shadow-[0_-4px_20px_rgba(121,83,68,0.08)]">
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FFF9F3]/95 backdrop-blur-md border-t border-[#EAD6D0] px-1.5 pt-1.5 safe-bottom-nav shadow-[0_-4px_20px_rgba(121,83,68,0.08)]">
             <div className="grid grid-cols-5 items-center">
-              <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); }} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'home' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><Home className="w-5 h-5" /><span className="text-[11px] font-medium">Início</span></button>
-              <button type="button" onClick={() => setActiveView('catalog')} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'catalog' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><LayoutGrid className="w-5 h-5" /><span className="text-[11px] font-medium">Categorias</span></button>
-              <button type="button" onClick={() => setActiveView('favorites')} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'favorites' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><Heart className="w-5 h-5" /><span className="text-[11px] font-medium">Favoritos</span></button>
-              <button type="button" onClick={() => setActiveView('account')} className={`flex flex-col items-center gap-0.5 py-1 relative ${activeView === 'account' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><User className="w-5 h-5" /><span className="text-[11px] font-medium">Minha Conta</span></button>
-              <button type="button" onClick={() => setIsAssistantOpen(true)} className="flex flex-col items-center gap-0.5 py-1 text-[#795344]"><Sparkles className="w-5 h-5 text-[#A90F4D]" /><span className="text-[11px] font-medium">Atendimento</span></button>
+              <button type="button" onClick={() => { setActiveView('home'); setSelectedCategory('all'); }} className={`flex flex-col items-center gap-0.5 py-1 relative min-w-0 ${activeView === 'home' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><Home className="w-5 h-5" /><span className="text-[10px] sm:text-[11px] font-medium truncate">Início</span></button>
+              <button type="button" onClick={() => setActiveView('catalog')} className={`flex flex-col items-center gap-0.5 py-1 relative min-w-0 ${activeView === 'catalog' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><LayoutGrid className="w-5 h-5" /><span className="text-[10px] sm:text-[11px] font-medium truncate">Categorias</span></button>
+              <button type="button" onClick={() => setActiveView('favorites')} className={`flex flex-col items-center gap-0.5 py-1 relative min-w-0 ${activeView === 'favorites' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><Heart className="w-5 h-5" /><span className="text-[10px] sm:text-[11px] font-medium truncate">Favoritos</span></button>
+              <button type="button" onClick={() => setActiveView('account')} className={`flex flex-col items-center gap-0.5 py-1 relative min-w-0 ${activeView === 'account' ? 'text-[#A90F4D]' : 'text-[#795344]'}`}><User className="w-5 h-5" /><span className="text-[10px] sm:text-[11px] font-medium truncate">Conta</span></button>
+              <button type="button" onClick={() => setIsAssistantOpen(true)} className="flex flex-col items-center gap-0.5 py-1 text-[#795344] min-w-0"><Sparkles className="w-5 h-5 text-[#A90F4D]" /><span className="text-[10px] sm:text-[11px] font-medium truncate">Atendimento</span></button>
             </div>
           </nav>
 
