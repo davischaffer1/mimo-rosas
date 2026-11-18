@@ -1984,6 +1984,63 @@ export default function App() {
       // 1. CHECKOUT TRANSPARENTE DE CARTÃO (MERCADO PAGO DIRETO NA TELA)
       // =========================================================================
       if (!asaasConfig.enabled && isCardMethod) {
+        let browserCardToken = '';
+        const numDigits = String(cardData.number || '').replace(/\D/g, '');
+        const expDigits = String(cardData.expiry || '').replace(/\D/g, '');
+        const expMonth = expDigits.slice(0, 2);
+        const rawYear = expDigits.slice(2);
+        const expYear = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+        const cvvDigits = String(cardData.cvv || '').replace(/\D/g, '');
+        const docDigits = String(cardData.cpfCnpj || checkoutData.document || '').replace(/\D/g, '');
+        const holder = String(cardData.holderName || checkoutData.name || 'CLIENTE MIMO ROSAS').trim();
+
+        // Gera o token do cartão direto no navegador da cliente (com IP e fingerprint do dispositivo)
+        if (activeMpPublicKey) {
+          try {
+            if (typeof window !== 'undefined' && typeof window.MercadoPago === 'function') {
+              const mpSdk = new window.MercadoPago(activeMpPublicKey, { locale: 'pt-BR' });
+              const sdkToken = await mpSdk.createCardToken({
+                cardNumber: numDigits,
+                cardholderName: holder,
+                cardExpirationMonth: expMonth,
+                cardExpirationYear: expYear,
+                securityCode: cvvDigits,
+                identificationType: docDigits.length === 14 ? 'CNPJ' : 'CPF',
+                identificationNumber: docDigits
+              });
+              if (sdkToken?.id) browserCardToken = sdkToken.id;
+            }
+            if (!browserCardToken) {
+              const bTokRes = await fetch(
+                `https://api.mercadopago.com/v1/card_tokens?public_key=${encodeURIComponent(activeMpPublicKey)}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    card_number: numDigits,
+                    expiration_month: Number(expMonth),
+                    expiration_year: Number(expYear),
+                    security_code: cvvDigits,
+                    cardholder: {
+                      name: holder,
+                      identification: {
+                        type: docDigits.length === 14 ? 'CNPJ' : 'CPF',
+                        number: docDigits
+                      }
+                    }
+                  })
+                }
+              );
+              const bTokData = await bTokRes.json().catch(() => null);
+              if (bTokRes.ok && bTokData?.id) browserCardToken = bTokData.id;
+            }
+          } catch { /* fallback no servidor */ }
+        }
+
+        const deviceId = (typeof window !== 'undefined' && window.MP_DEVICE_SESSION_ID)
+          ? String(window.MP_DEVICE_SESSION_ID)
+          : undefined;
+
         const cardRes = await fetch('/api/asaas/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1991,8 +2048,10 @@ export default function App() {
             action: 'mp_card',
             order: newOrder,
             card: {
+              token: browserCardToken || undefined,
+              deviceId,
               number: cardData.number,
-              holderName: cardData.holderName || checkoutData.name,
+              holderName: holder,
               expiry: cardData.expiry,
               cvv: cardData.cvv,
               cpfCnpj: cardData.cpfCnpj || checkoutData.document,
