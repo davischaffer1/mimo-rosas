@@ -745,7 +745,9 @@ export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToke
   const expYear = Number(rawYear.length === 2 ? `20${rawYear}` : rawYear);
   const cvv = onlyDigits(card.cvv);
   const docClean = onlyDigits(card.cpfCnpj || order.document || '');
-  const installments = Math.max(1, Math.min(12, Number(card.installments || 1)));
+  // O Mercado Pago exige parcela mínima de R$ 5,00 por parcela no cartão de crédito
+  const maxByMinInstallment = Math.max(1, Math.floor(amount / 5));
+  const installments = Math.max(1, Math.min(12, maxByMinInstallment, Number(card.installments || 1)));
 
   let cardTokenId = String(card.token || '').trim();
   let paymentMethodId = String(card.paymentMethodId || '').trim();
@@ -912,7 +914,10 @@ export async function mpCreateTransparentCard({ orderOrId, card = {}, accessToke
 
   const payData = await payRes.json().catch(() => ({}));
   if (!payRes.ok) {
-    const errMsg = payData?.cause?.[0]?.description || payData?.message || 'Não foi possível processar o cartão agora.';
+    let errMsg = payData?.cause?.[0]?.description || payData?.message || 'Não foi possível processar o cartão agora.';
+    if (/invalid transaction_amount/i.test(errMsg)) {
+      errMsg = 'O Mercado Pago exige parcela mínima de R$ 5,00 no cartão de crédito. Para valores menores, selecione 1x à vista.';
+    }
     return { ok: false, message: errMsg, detail: payData };
   }
 

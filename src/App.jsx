@@ -6085,7 +6085,11 @@ export default function App() {
                       {/* FORMULÁRIO DE CARTÃO DE CRÉDITO TRANSPARENTE (DENTRO DO SITE) */}
                       {['card', 'mercadopago'].includes(checkoutData.paymentMethod) && !asaasConfig.enabled && (() => {
                         const detectedBrand = detectCardBrandFrontend(cardData.number);
-                        const maxInst = Math.max(1, Number(storeConfig.maxInstallments || 3));
+                        const configuredMaxInst = Math.max(1, Number(storeConfig.maxInstallments || 3));
+                        // O Mercado Pago e as operadoras de cartão exigem parcela mínima de R$ 5,00 por parcela
+                        const maxByMinParcela = Math.max(1, Math.floor(Number(cartTotal || 0) / 5));
+                        const maxInst = Math.max(1, Math.min(configuredMaxInst, maxByMinParcela));
+                        const selectedInst = Math.min(Number(cardData.installments || 1), maxInst);
                         return (
                           <div className="p-4 sm:p-5 rounded-2xl bg-[#F6E9E5]/80 border border-[#DFC3BC] space-y-3.5">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -6183,7 +6187,7 @@ export default function App() {
                               <div>
                                 <label className="block font-semibold text-[#4A2532] mb-1">Parcelamento *</label>
                                 <select
-                                  value={cardData.installments}
+                                  value={selectedInst}
                                   onChange={(e) => setCardData({ ...cardData, installments: Number(e.target.value) })}
                                   className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#DFC3BC] text-sm font-semibold text-[#4A2532] focus:outline-none focus:border-[#A90F4D]"
                                 >
@@ -6193,6 +6197,11 @@ export default function App() {
                                     </option>
                                   ))}
                                 </select>
+                                {maxInst < configuredMaxInst && (
+                                  <span className="block text-[10px] text-[#795344] mt-1">
+                                    Parcela mínima exigida pela operadora: R$ 5,00
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -6205,12 +6214,16 @@ export default function App() {
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span>Processando pagamento seguro...</span>
                           </>
-                        ) : ['card', 'mercadopago'].includes(checkoutData.paymentMethod) ? (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Finalizar e Pagar com Cartão ({cardData.installments}x de {formatBRL(cartTotal / (cardData.installments || 1))})</span>
-                          </>
-                        ) : (
+                        ) : ['card', 'mercadopago'].includes(checkoutData.paymentMethod) ? (() => {
+                          const maxAllowedInst = Math.max(1, Math.min(Number(storeConfig.maxInstallments || 3), Math.max(1, Math.floor(Number(cartTotal || 0) / 5))));
+                          const effInst = Math.min(Number(cardData.installments || 1), maxAllowedInst);
+                          return (
+                            <>
+                              <ShieldCheck className="w-4 h-4" />
+                              <span>Finalizar e Pagar com Cartão ({effInst}x de {formatBRL(cartTotal / effInst)})</span>
+                            </>
+                          );
+                        })() : (
                           <>
                             <QrCode className="w-4 h-4" />
                             <span>Gerar QR Code PIX • {formatBRL(cartTotal)}</span>
